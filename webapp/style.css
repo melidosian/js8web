@@ -77,10 +77,16 @@
     50% { background: #c0392b; }
 }
 
+.nav-tabs {
+    flex-shrink: 0;
+}
+
 .chat {
-    overflow: auto;
     display: flex;
     flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .chat .chat-header {
@@ -101,8 +107,8 @@
 
 .chat .chat-history {
     overflow-y: scroll;
-    flex: 0 1 auto;
-    height: 100%;
+    flex: 1 1 0;
+    min-height: 0;
     padding: 20px;
     border-bottom: 2px solid #fff
 }
