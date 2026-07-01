@@ -43,24 +43,25 @@ export default {
                 label,
                 filter
             })
+            return id
         },
         callsignSelected(callsign) {
-            this.newTab(callsign, {
-                Callsign: callsign
-            })
+            const existing = this.chats.find(c => c.filter.Callsign === callsign)
+            if (existing) {
+                this.activateTab(existing.id)
+                return
+            }
+            this.activateTab(this.newTab(callsign, { Callsign: callsign }))
         },
         frequencySelected(frequency) {
             const from = Math.floor((frequency - 25) / 50) * 50
             const to = from + 50
-            this.newTab(
-                from + 'Hz',
-                {
-                    Freq: {
-                        From: from,
-                        To: to
-                    }
-                }
-            )
+            const existing = this.chats.find(c => c.filter.Freq && c.filter.Freq.From === from && c.filter.Freq.To === to)
+            if (existing) {
+                this.activateTab(existing.id)
+                return
+            }
+            this.activateTab(this.newTab(from + 'Hz', { Freq: { From: from, To: to } }))
         },
     },
     template: `
