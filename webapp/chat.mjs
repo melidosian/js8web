@@ -1,12 +1,14 @@
 import axios from 'axios'
 import ChatMessage from './chat-message.mjs'
+import QuickReplyBar from './quick-reply-bar.mjs'
 const EXPECTED_MESSAGES_COUNT = 100
 
 export default {
-    props: ['filter', 'showRawPackets'],
+    props: ['filter', 'showRawPackets', 'quickReplies'],
     emits: ['callsignSelected', 'frequencySelected', 'toast'],
     components: {
         ChatMessage,
+        QuickReplyBar,
     },
     created() {
         this.fetchNewestMessages().then(messages => {   
@@ -31,6 +33,7 @@ export default {
             loadingAfter: false,
             txText: '',
             txSending: false,
+            savedSelection: null,
         }
     },
     methods: {
@@ -159,7 +162,25 @@ export default {
                 e.preventDefault()
                 this.sendMessage()
             }
-        }
+        },
+        saveCursorPosition() {
+            const input = this.$refs.txInput
+            if (input) this.savedSelection = { start: input.selectionStart, end: input.selectionEnd }
+        },
+        insertQuickReply(text) {
+            const len = this.txText.length
+            const start = this.savedSelection ? this.savedSelection.start : len
+            const end   = this.savedSelection ? this.savedSelection.end   : len
+            this.txText = this.txText.slice(0, start) + text + this.txText.slice(end)
+            const newPos = start + text.length
+            this.savedSelection = { start: newPos, end: newPos }
+            this.$nextTick(() => {
+                const input = this.$refs.txInput
+                if (!input) return
+                input.focus()
+                input.setSelectionRange(newPos, newPos)
+            })
+        },
     },
     template: `
     <div class="chat">
@@ -173,9 +194,10 @@ export default {
             <div class="history-bottom" v-if="atBottom"><i class="bi bi-broadcast"></i> receiving <i class="bi bi-broadcast"></i></div>
         </div>
         <div class="chat-input" v-if="$root.authenticated && ($root.authUser?.role === 'admin' || $root.authUser?.role === 'operator')">
+            <QuickReplyBar :quickReplies="quickReplies" @insert="insertQuickReply" />
             <div class="input-group">
                 <span class="input-group-text" v-if="filter && filter.Callsign">@{{ filter.Callsign }}</span>
-                <input type="text" class="form-control" :placeholder="filter && filter.Callsign ? 'Type reply...' : 'Type message to send via JS8Call...'" v-model="txText" @keydown="handleTxKeydown" ref="txInput" :disabled="txSending">
+                <input type="text" class="form-control" :placeholder="filter && filter.Callsign ? 'Type reply...' : 'Type message to send via JS8Call...'" v-model="txText" @keydown="handleTxKeydown" @blur="saveCursorPosition" ref="txInput" :disabled="txSending">
                 <button class="btn btn-primary" @click="sendMessage" :disabled="!txText.trim() || txSending">
                     <i class="bi" :class="txSending ? 'bi-hourglass-split' : 'bi-send'"></i> Send
                 </button>

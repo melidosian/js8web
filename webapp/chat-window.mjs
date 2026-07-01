@@ -1,5 +1,7 @@
 import Chat from './chat.mjs'
 import AdminUsers from './admin-users.mjs'
+import QuickReplySettings from './quick-reply-settings.mjs'
+import { loadQuickReplies, saveQuickReplies } from './quick-replies.mjs'
 
 function uidGenerator() {
     var S4 = function () {
@@ -12,6 +14,7 @@ export default {
     components: {
         Chat,
         AdminUsers,
+        QuickReplySettings,
     },
     emits: ['toast'],
     data() {
@@ -26,8 +29,14 @@ export default {
             ],
             uid: uidGenerator(),
             settingsShowRawPackets: true,
+            quickReplies: loadQuickReplies(),
         }
-
+    },
+    watch: {
+        quickReplies: {
+            deep: true,
+            handler(val) { saveQuickReplies(val) }
+        }
     },
     methods: {
         activateTab(selected) {
@@ -82,9 +91,9 @@ export default {
         </li>
     </ul>
     <template v-for="chat in chats">
-        <Chat v-show="activeTab == chat.id" :filter="chat.filter" :showRawPackets="this.settingsShowRawPackets" @callsignSelected="this.callsignSelected" @frequencySelected="this.frequencySelected" @toast="e => $emit('toast', e)" />
+        <Chat v-show="activeTab == chat.id" :filter="chat.filter" :showRawPackets="this.settingsShowRawPackets" :quickReplies="quickReplies" @callsignSelected="this.callsignSelected" @frequencySelected="this.frequencySelected" @toast="e => $emit('toast', e)" />
     </template>
-    <div v-show="activeTab == 'settings'">
+    <div v-show="activeTab == 'settings'" class="settings-panel">
         <div class="row">
             <div class="col-12">
                 <div class="form-check form-switch settings">
@@ -93,6 +102,8 @@ export default {
                 </div>
             </div>
         </div>
+        <hr>
+        <QuickReplySettings v-model="quickReplies" />
     </div>
     <AdminUsers v-if="$root.authUser?.role === 'admin'" v-show="activeTab == 'admin'" @toast="e => $emit('toast', e)" />
     `

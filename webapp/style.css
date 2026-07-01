@@ -366,6 +366,51 @@
     color: #3498db;
 }
 
+/* ============ Quick Reply Bar ============ */
+
+.quick-reply-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    padding: 0.4rem 0.5rem 0;
+}
+
+.quick-reply-btn {
+    flex-shrink: 0;
+}
+
+/* ============ Settings Panel ============ */
+
+.settings-panel {
+    overflow-y: auto;
+    height: 100%;
+    padding: 0.75rem;
+}
+
+/* ============ Quick Reply Settings ============ */
+
+.quick-reply-settings .qr-item {
+    padding: 0.3rem 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.quick-reply-settings .qr-item:last-child {
+    border-bottom: none;
+}
+
+.quick-reply-settings .qr-preview-btn {
+    min-width: 64px;
+}
+
+.quick-reply-settings .qr-ctrl {
+    padding: 0.1rem 0.4rem;
+    line-height: 1.4;
+}
+
+.quick-reply-settings .qr-edit {
+    background: #f8f9fa;
+}
+
 /* ============ Chat Input ============ */
 
 .chat-input {
