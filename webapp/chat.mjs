@@ -50,7 +50,7 @@ export default {
                 params: {
                     startTime: startTime,
                     direction: direction,
-                    filter: this.filter,
+                    filter: JSON.stringify(this.filter),
                 }
             }).then(response => response.data)
         },
