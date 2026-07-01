@@ -139,7 +139,8 @@ export default {
             if (!text || this.txSending) return
 
             this.txSending = true
-            axios.post('/api/tx-message', { text })
+            const body = this.filter?.Callsign ? `@${this.filter.Callsign} ${text}` : text
+            axios.post('/api/tx-message', { text: body })
                 .then(() => {
                     this.txText = ''
                     this.$emit('toast', { type: 'success', message: 'Message queued for transmission' })
@@ -173,7 +174,8 @@ export default {
         </div>
         <div class="chat-input" v-if="$root.authenticated && ($root.authUser?.role === 'admin' || $root.authUser?.role === 'operator')">
             <div class="input-group">
-                <input type="text" class="form-control" placeholder="Type message to send via JS8Call..." v-model="txText" @keydown="handleTxKeydown" ref="txInput" :disabled="txSending">
+                <span class="input-group-text" v-if="filter && filter.Callsign">@{{ filter.Callsign }}</span>
+                <input type="text" class="form-control" :placeholder="filter && filter.Callsign ? 'Type reply...' : 'Type message to send via JS8Call...'" v-model="txText" @keydown="handleTxKeydown" ref="txInput" :disabled="txSending">
                 <button class="btn btn-primary" @click="sendMessage" :disabled="!txText.trim() || txSending">
                     <i class="bi" :class="txSending ? 'bi-hourglass-split' : 'bi-send'"></i> Send
                 </button>
