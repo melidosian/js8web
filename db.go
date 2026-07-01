@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/PiotrTopa/js8web/model"
 	_ "github.com/mattn/go-sqlite3"
@@ -58,5 +59,14 @@ func initDbConnection() *sql.DB {
 		initDb(db)
 	}
 
+	runMigrations(db)
+
 	return db
+}
+
+func runMigrations(db *sql.DB) {
+	_, err := db.Exec("ALTER TABLE `TX_FRAME` ADD COLUMN `TEXT` TEXT DEFAULT ''")
+	if err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+		logger.Sugar().Warnw("DB migration warning", "error", err)
+	}
 }

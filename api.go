@@ -203,6 +203,7 @@ func apiTxMessagePost(outgoingEvents chan<- model.Js8callEvent) func(http.Respon
 		// Non-blocking send — if the channel is full, report an error
 		select {
 		case outgoingEvents <- event:
+			setPendingTxText(text)
 			logger.Sugar().Infow("TX message queued", "text", text)
 		default:
 			logger.Sugar().Warnw("TX message channel full, message dropped", "text", text)

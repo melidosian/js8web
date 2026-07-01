@@ -12,6 +12,7 @@ func txFrameNotifier(event *model.Js8callEvent, websocketEvents chan<- model.Web
 		return errors.New("can not convert TxFrame event to db object")
 	}
 	obj.ApplyRigStatus(&rigStatusCache)
+	obj.Text = popPendingTxText()
 	databaseObjects <- obj
 	return nil
 }

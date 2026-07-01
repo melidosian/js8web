@@ -68,6 +68,7 @@ func chatMessageFromTxFrame(f *TxFrameObj) ChatMessage {
 		Mode:      f.Mode,
 		Speed:     f.Speed,
 		Selected:  f.Selected,
+		Text:      f.Text,
 	}
 }
 

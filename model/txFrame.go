@@ -9,9 +9,9 @@ import (
 )
 
 var (
-	SQL_TX_FRAME_INSERT      = "INSERT INTO `TX_FRAME` (`TIMESTAMP`, `CHANNEL`, `DIAL`, `FREQ`, `OFFSET`, `MODE`, `SPEED`, `SELECTED`, `TONES`) values(?, ?, ?, ?, ?, ?, ?, ?, ?)"
-	SQL_TX_FRAME_LIST_AFTER  = "SELECT `ID`, `TIMESTAMP`, `CHANNEL`, `DIAL`, `FREQ`, `OFFSET`, `MODE`, `SPEED`, `SELECTED` FROM `TX_FRAME` WHERE `TIMESTAMP` > ?1 ORDER BY `ID` ASC LIMIT 100"
-	SQL_TX_FRAME_LIST_BEFORE = "SELECT * FROM (SELECT `ID`, `TIMESTAMP`, `CHANNEL`, `DIAL`, `FREQ`, `OFFSET`, `MODE`, `SPEED`, `SELECTED` FROM `TX_FRAME` WHERE `TIMESTAMP` <= ?1 ORDER BY `ID` DESC LIMIT 100) ORDER BY `ID` ASC"
+	SQL_TX_FRAME_INSERT      = "INSERT INTO `TX_FRAME` (`TIMESTAMP`, `CHANNEL`, `DIAL`, `FREQ`, `OFFSET`, `MODE`, `SPEED`, `SELECTED`, `TONES`, `TEXT`) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	SQL_TX_FRAME_LIST_AFTER  = "SELECT `ID`, `TIMESTAMP`, `CHANNEL`, `DIAL`, `FREQ`, `OFFSET`, `MODE`, `SPEED`, `SELECTED`, COALESCE(`TEXT`, '') FROM `TX_FRAME` WHERE `TIMESTAMP` > ?1 ORDER BY `ID` ASC LIMIT 100"
+	SQL_TX_FRAME_LIST_BEFORE = "SELECT * FROM (SELECT `ID`, `TIMESTAMP`, `CHANNEL`, `DIAL`, `FREQ`, `OFFSET`, `MODE`, `SPEED`, `SELECTED`, COALESCE(`TEXT`, '') FROM `TX_FRAME` WHERE `TIMESTAMP` <= ?1 ORDER BY `ID` DESC LIMIT 100) ORDER BY `ID` ASC"
 )
 
 type TxFrameObj struct {
@@ -25,6 +25,7 @@ type TxFrameObj struct {
 	Speed     string
 	Selected  string
 	Tones     []int
+	Text      string
 }
 
 func (o *TxFrameObj) WsType() string {
@@ -73,6 +74,7 @@ func (obj *TxFrameObj) Insert(db *sql.DB) error {
 		&obj.Speed,
 		&obj.Selected,
 		string(marshalledTones),
+		&obj.Text,
 	)
 	if err != nil {
 		return fmt.Errorf("error executing SQL query inserting new TxFrame record, caused by %w", err)
@@ -98,6 +100,7 @@ func (obj *TxFrameObj) Scan(rows *sql.Rows) error {
 		&obj.Mode,
 		&obj.Speed,
 		&obj.Selected,
+		&obj.Text,
 	)
 	if err != nil {
 		return err

@@ -12,7 +12,7 @@ export default {
                 <span class="from"><i class="bi bi-send"></i> TX</span>
                 <span class="selected" v-if="message.Selected"> → {{ message.Selected }}</span>
             </div>
-            <div class="content">Transmitted frame</div>
+            <div class="content">{{ message.Text || 'Transmitted frame' }}</div>
         </li>
     `
 }
