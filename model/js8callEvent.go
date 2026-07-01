@@ -14,17 +14,32 @@ var (
 	EVENT_TYPE_STATION_CALLSIGN = "STATION.CALLSIGN"
 	EVENT_TYPE_STATION_GRID     = "STATION.GRID"
 
+	// inbox events
+	EVENT_TYPE_INBOX_MESSAGE      = "INBOX.MESSAGE"
+	EVENT_TYPE_INBOX_MESSAGES     = "INBOX.MESSAGES"
+	EVENT_TYPE_INBOX_GET_MESSAGES = "INBOX.GET_MESSAGES"
+	EVENT_TYPE_INBOX_STORE_MESSAGE = "INBOX.STORE_MESSAGE"
+
+	// rig/mode events
+	EVENT_TYPE_RIG_FREQ      = "RIG.FREQ"
+	EVENT_TYPE_RIG_GET_FREQ  = "RIG.GET_FREQ"
+	EVENT_TYPE_RIG_SET_FREQ  = "RIG.SET_FREQ"
+	EVENT_TYPE_MODE_SPEED    = "MODE.SPEED"
+	EVENT_TYPE_MODE_GET_SPEED = "MODE.GET_SPEED"
+	EVENT_TYPE_MODE_SET_SPEED = "MODE.SET_SPEED"
+
 	// outgoing event types (sent to JS8Call)
 	EVENT_TYPE_TX_SEND_MESSAGE = "TX.SEND_MESSAGE"
 
 	// event types as seen in Websocket communication
-	WS_EVENT_TYPE_RIG_PTT      = "RIG.PTT"
-	WS_EVENT_TYPE_RIG_STATUS   = "RIG.STATUS"
-	WS_EVENT_TYPE_STATION_INFO = "STATION.INFO"
-	WS_OBJ_TYPE_RX_PACKET      = "RX.PACKET"
-	WS_OBJ_TYPE_RX_SPOT        = "RX.SPOT"
-	WS_OBJ_TYPE_TX_FRAME       = "TX.FRAME"
-	WS_OBJ_TYPE_OTHER          = "OTHER"
+	WS_EVENT_TYPE_RIG_PTT       = "RIG.PTT"
+	WS_EVENT_TYPE_RIG_STATUS    = "RIG.STATUS"
+	WS_EVENT_TYPE_STATION_INFO  = "STATION.INFO"
+	WS_OBJ_TYPE_RX_PACKET       = "RX.PACKET"
+	WS_OBJ_TYPE_RX_SPOT         = "RX.SPOT"
+	WS_OBJ_TYPE_TX_FRAME        = "TX.FRAME"
+	WS_OBJ_TYPE_INBOX_MESSAGE   = "INBOX.MESSAGE"
+	WS_OBJ_TYPE_OTHER           = "OTHER"
 )
 
 type Js8callEvent struct {
@@ -36,30 +51,39 @@ type Js8callEvent struct {
 	Data     interface{}
 }
 
+// InboxMessageParam is an element in the MESSAGES array from INBOX.MESSAGES events.
+type InboxMessageParam struct {
+	Callsign string `json:"CALLSIGN"`
+	Text     string `json:"TEXT"`
+	Utc      int64  `json:"UTC"`
+}
+
 type Js8callEventParams struct {
-	Id        interface{} `json:"_ID"`
-	Dial      uint32      `json:"DIAL"`
-	Freq      uint32      `json:"FREQ"`
-	Offset    uint16      `json:"OFFSET"`
-	Snr       int16       `json:"SNR"`
-	Speed     int         `json:"SPEED"`
-	TimeDrift float32     `json:"TDRIFT"`
-	Grid      string      `json:"GRID"`
-	From      string      `json:"FROM"`
-	Call      string      `json:"CALL"`
-	To        string      `json:"TO"`
-	Text      string      `json:"TEXT"`
-	Command   string      `json:"CMD"`
-	Extra     string      `json:"EXTRA"`
-	PTT       bool        `json:"PTT"`
-	Tones     []int       `json:"TONES"`
-	UTC       int64       `json:"UTC"`
-	Selected  string      `json:"SELECTED"`
-	Band      string      `json:"BAND"`
-	Mode      string      `json:"MODE"`
-	Submode   string      `json:"SUBMODE"`
-	RptSent   string      `json:"RPT.SENT"`
-	RptRecv   string      `json:"RPT.RECV"`
+	Id        interface{}         `json:"_ID"`
+	Dial      uint32              `json:"DIAL"`
+	Freq      uint32              `json:"FREQ"`
+	Offset    uint16              `json:"OFFSET"`
+	Snr       int16               `json:"SNR"`
+	Speed     int                 `json:"SPEED"`
+	TimeDrift float32             `json:"TDRIFT"`
+	Grid      string              `json:"GRID"`
+	From      string              `json:"FROM"`
+	Call      string              `json:"CALL"`
+	To        string              `json:"TO"`
+	Text      string              `json:"TEXT"`
+	Command   string              `json:"CMD"`
+	Extra     string              `json:"EXTRA"`
+	PTT       bool                `json:"PTT"`
+	Tones     []int               `json:"TONES"`
+	UTC       int64               `json:"UTC"`
+	Selected  string              `json:"SELECTED"`
+	Band      string              `json:"BAND"`
+	Mode      string              `json:"MODE"`
+	Submode   string              `json:"SUBMODE"`
+	RptSent   string              `json:"RPT.SENT"`
+	RptRecv   string              `json:"RPT.RECV"`
+	Callsign  string              `json:"CALLSIGN"`
+	Messages  []InboxMessageParam `json:"MESSAGES"`
 }
 
 func calcCahnnelFromOffset(offset uint16) uint16 {

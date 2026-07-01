@@ -508,6 +508,141 @@
     color: #fff;
 }
 
+/* ============ Inbox ============ */
+
+.inbox-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.inbox-compose {
+    flex-shrink: 0;
+    padding: 0.6rem;
+    border-bottom: 1px solid #dee2e6;
+    background: #f8f9fa;
+}
+
+.inbox-callsign-input {
+    max-width: 160px;
+    flex-shrink: 0;
+}
+
+.inbox-list {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.inbox-msg {
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.inbox-msg:last-child {
+    border-bottom: none;
+}
+
+.inbox-msg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.2rem;
+}
+
+.inbox-from {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.inbox-time {
+    font-size: 0.75em;
+    color: #95a5a6;
+}
+
+.inbox-msg-body {
+    color: #444;
+    font-size: 0.95em;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* ============ Rig Control ============ */
+
+.rig-panel {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.rig-section {
+    margin-bottom: 2rem;
+}
+
+.rig-section-label {
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #95a5a6;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.rig-current {
+    margin-bottom: 0.75rem;
+}
+
+.rig-value {
+    font-size: 2.2rem;
+    font-weight: 300;
+    color: #2c3e50;
+    line-height: 1;
+}
+
+.rig-unit {
+    font-size: 1rem;
+    color: #95a5a6;
+    margin-left: 0.3rem;
+}
+
+.rig-sub {
+    font-size: 0.85rem;
+    color: #95a5a6;
+}
+
+.rig-speed-display {
+    font-size: 1.5rem;
+    text-transform: capitalize;
+}
+
+.rig-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.rig-preset-btn {
+    min-width: 72px;
+    min-height: 44px;
+    font-family: monospace;
+}
+
+.rig-speed-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.rig-speed-btn {
+    min-width: 80px;
+    min-height: 48px;
+    font-size: 1rem;
+}
+
 /* ============ Admin Panel ============ */
 
 .admin-panel {

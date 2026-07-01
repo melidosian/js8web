@@ -72,6 +72,22 @@ func startWebappServer(db *sql.DB, wsEventsSessionContainer *websocketSessionCon
 		}
 	}))
 
+	// Inbox (GET: any authenticated user; POST: operator/admin enforced inside handler)
+	mux.HandleFunc("/api/inbox", authRequired(methodHandler(methodRouter{
+		get:  apiInboxGet,
+		post: apiInboxPost(outgoingEvents),
+	}, db)))
+
+	// Rig control (operator/admin only)
+	mux.HandleFunc("/api/rig/freq", roleRequired(
+		[]string{model.ROLE_ADMIN, model.ROLE_OPERATOR},
+		methodHandler(methodRouter{post: apiRigFreqPost(outgoingEvents)}, db),
+	))
+	mux.HandleFunc("/api/rig/speed", roleRequired(
+		[]string{model.ROLE_ADMIN, model.ROLE_OPERATOR},
+		methodHandler(methodRouter{post: apiRigSpeedPost(outgoingEvents)}, db),
+	))
+
 	mux.HandleFunc("/ws/events", websocketHandler(wsEventsSessionContainer))
 	mux.Handle("/", webappFs)
 

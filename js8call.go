@@ -59,6 +59,22 @@ func writeEventsToJs8call(events <-chan model.Js8callEvent, disconnected chan<- 
 	}
 }
 
+func sendConnectEvents(writer *bufio.Writer) {
+	initTypes := []string{
+		model.EVENT_TYPE_INBOX_GET_MESSAGES,
+		model.EVENT_TYPE_RIG_GET_FREQ,
+		model.EVENT_TYPE_MODE_GET_SPEED,
+	}
+	for _, t := range initTypes {
+		data, err := json.Marshal(model.Js8callEvent{Type: t})
+		if err != nil {
+			continue
+		}
+		writer.WriteString(string(data) + "\n")
+	}
+	writer.Flush()
+}
+
 func attachEventStreamToJs8callConnection(incomingEvents chan<- model.Js8callEvent, outgoingEvents <-chan model.Js8callEvent, conn net.Conn) {
 	disconnected := make(chan int)
 	incomingJs8callEvents := make(chan model.Js8callEvent, 1)
@@ -70,6 +86,8 @@ func attachEventStreamToJs8callConnection(incomingEvents chan<- model.Js8callEve
 
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
+
+	sendConnectEvents(writer)
 
 	go readEventsFromJs8call(incomingJs8callEvents, disconnected, reader)
 	go writeEventsToJs8call(outgoingJs8callEvents, disconnected, writer)

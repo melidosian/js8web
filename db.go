@@ -65,8 +65,23 @@ func initDbConnection() *sql.DB {
 }
 
 func runMigrations(db *sql.DB) {
+	// Add TEXT column to TX_FRAME (idempotent)
 	_, err := db.Exec("ALTER TABLE `TX_FRAME` ADD COLUMN `TEXT` TEXT DEFAULT ''")
 	if err != nil && !strings.Contains(err.Error(), "duplicate column name") {
 		logger.Sugar().Warnw("DB migration warning", "error", err)
 	}
+
+	// Create INBOX_MESSAGE table if it doesn't exist
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS INBOX_MESSAGE (
+		ID INTEGER PRIMARY KEY AUTOINCREMENT,
+		TIMESTAMP TEXT NOT NULL,
+		CALLSIGN TEXT NOT NULL,
+		MESSAGE TEXT NOT NULL,
+		UTC_MS INTEGER NOT NULL DEFAULT 0,
+		UNIQUE(CALLSIGN, UTC_MS, MESSAGE)
+	)`)
+	if err != nil {
+		logger.Sugar().Warnw("DB migration warning (INBOX_MESSAGE)", "error", err)
+	}
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS INBOX_MESSAGE_TIMESTAMP_IDX ON INBOX_MESSAGE(TIMESTAMP)`)
 }

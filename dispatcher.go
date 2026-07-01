@@ -48,6 +48,14 @@ func dispatchStateChangeEvents(events <-chan model.Js8callEvent) (<-chan model.W
 				f = stationInfoNotifier
 			case model.EVENT_TYPE_RIG_PTT:
 				f = rigPttNotifier
+			case model.EVENT_TYPE_RIG_FREQ:
+				f = rigFreqNotifier
+			case model.EVENT_TYPE_MODE_SPEED:
+				f = modeSpeedNotifier
+			case model.EVENT_TYPE_INBOX_MESSAGES:
+				f = inboxMessagesNotifier
+			case model.EVENT_TYPE_INBOX_MESSAGE:
+				f = inboxMessageNotifier
 			default:
 				f = defaultNotifier
 			}

@@ -2,6 +2,8 @@ import Chat from './chat.mjs'
 import AdminUsers from './admin-users.mjs'
 import QuickReplySettings from './quick-reply-settings.mjs'
 import { loadQuickReplies, saveQuickReplies } from './quick-replies.mjs'
+import Inbox from './inbox.mjs'
+import Rig from './rig.mjs'
 
 function uidGenerator() {
     var S4 = function () {
@@ -15,6 +17,8 @@ export default {
         Chat,
         AdminUsers,
         QuickReplySettings,
+        Inbox,
+        Rig,
     },
     emits: ['toast'],
     data() {
@@ -83,6 +87,12 @@ export default {
                 </a>
             </li>
         </template>
+        <li class="nav-item" :class="{active: activeTab == 'inbox'}">
+            <a class="nav-link" :class="{active: activeTab == 'inbox'}" @click="activateTab('inbox')" href="#"><i class="bi bi-inbox"></i> Inbox</a>
+        </li>
+        <li class="nav-item" :class="{active: activeTab == 'rig'}">
+            <a class="nav-link" :class="{active: activeTab == 'rig'}" @click="activateTab('rig')" href="#"><i class="bi bi-broadcast"></i> Rig</a>
+        </li>
         <li class="nav-item" :class="{active: activeTab == 'settings'}">
             <a class="nav-link" :class="{active: activeTab == 'settings'}" @click="activateTab('settings')" href="#"><i class="bi bi-gear"></i></a>
         </li>
@@ -105,6 +115,8 @@ export default {
         <hr>
         <QuickReplySettings v-model="quickReplies" />
     </div>
+    <Inbox v-if="activeTab == 'inbox'" v-show="activeTab == 'inbox'" @toast="e => $emit('toast', e)" />
+    <Rig v-if="activeTab == 'rig'" v-show="activeTab == 'rig'" @toast="e => $emit('toast', e)" />
     <AdminUsers v-if="$root.authUser?.role === 'admin'" v-show="activeTab == 'admin'" @toast="e => $emit('toast', e)" />
     `
 }
