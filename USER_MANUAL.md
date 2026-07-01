@@ -2,16 +2,20 @@
 
 ## What is js8web?
 
-js8web is a web-based monitor for [JS8Call](http://js8call.com/), an amateur radio digital communication program. It runs alongside JS8Call on your computer (or on any machine that can reach JS8Call over the network) and provides a browser-accessible dashboard showing received messages, station information, and rig status in real time.
+js8web is a web-based monitor and control interface for [JS8Call](http://js8call.com/), an amateur radio digital communication program. It runs alongside JS8Call and provides a browser-accessible dashboard showing received messages, station information, rig status, and inbox in real time. It also lets you transmit messages, control rig frequency and speed, and manage your JS8Call inbox from any device on your local network.
 
 **Key features:**
-- Real-time chat-style display of all received JS8Call messages
-- Filterable message history by callsign or frequency
-- Tabbed interface for monitoring multiple conversations simultaneously
-- Color-coded signal quality indicators (SNR, speed, time drift)
-- Scrollable history with automatic loading of older messages
-- Single binary — no additional software or runtime dependencies needed
-- Access from any device with a web browser on your local network
+- Real-time chat-style display of received JS8Call messages
+- Filterable tabs by callsign or frequency, with auto-activate and deduplication
+- Quick-reply button bar for one-tap common messages (fully configurable)
+- Automatic `@CALLSIGN` prefixing when composing in a filtered tab
+- Inbox tab for JS8Call's built-in message store
+- Rig Control tab for tuning frequency and TX speed
+- TX messages show actual transmitted text in the chat
+- Color-coded SNR, speed, and drift indicators
+- Mobile-friendly layout with 44px+ touch targets
+- Role-based access (Admin / Operator / Monitor)
+- Single binary with embedded web interface
 
 ---
 
@@ -28,381 +32,364 @@ js8web is a web-based monitor for [JS8Call](http://js8call.com/), an amateur rad
 ### Building from Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/PiotrTopa/js8web.git
 cd js8web
-
-# Build the binary
 go build -o js8web .
 ```
 
 This produces a single `js8web` executable with the web interface embedded inside.
 
-### Pre-built Binary
-
-If pre-built binaries are available from the releases page, download the one for your operating system and architecture. No installation is needed — just place it somewhere convenient.
-
 ### Running with Docker
 
-js8web is available as a Docker container — no Go toolchain or build step required.
-
-#### 1. Build the image
-
 ```bash
+# Build the image
 git clone https://github.com/PiotrTopa/js8web.git
 cd js8web
 docker build -t js8web .
-```
 
-#### 2. Run the container
-
-```bash
+# Run
 docker run -d \
   --name js8web \
-  -p 8080:8080 \
+  -p 8081:8081 \
   -v js8web-data:/data \
   js8web \
+  -port 8081 \
   -js8call-addr <JS8CALL_HOST>:2442
 ```
 
-Replace `<JS8CALL_HOST>` with the IP address or hostname of the machine running JS8Call. If JS8Call runs on the same host as Docker, use the host's LAN IP (not `localhost`, since the container has its own network).
+Replace `<JS8CALL_HOST>` with the IP address of the machine running JS8Call. If JS8Call is on the same host, use the host's LAN IP (not `localhost` inside Docker). On Linux you can use `--network host` to bypass this.
 
-> **Tip:** On Linux you can use `--network host` instead of `-p 8080:8080` to share the host's network stack directly. In that case `localhost` will reach JS8Call:
-> ```bash
-> docker run -d --name js8web --network host -v js8web-data:/data js8web
-> ```
-
-#### 3. Open the web interface
-
-Navigate to `http://localhost:8080` (or `http://<host-ip>:8080` from another device).
-
-The default login is **admin** / **admin** — change the password immediately via the Admin panel.
-
-#### Configuration
-
-All command-line flags work as usual — append them after the image name:
-
-```bash
-docker run -d \
-  --name js8web \
-  -p 9090:9090 \
-  -v js8web-data:/data \
-  js8web \
-  -js8call-addr 192.168.1.50:2442 \
-  -port 9090 \
-  -log-level debug
-```
-
-Alternatively, use environment variables:
-
-```bash
-docker run -d \
-  --name js8web \
-  -p 8080:8080 \
-  -v js8web-data:/data \
-  -e JS8WEB_JS8CALL_ADDR=192.168.1.50:2442 \
-  -e JS8WEB_LOG_LEVEL=debug \
-  js8web
-```
-
-#### Data persistence
-
-The database is stored in the `/data` volume inside the container. The `-v js8web-data:/data` flag creates a named Docker volume that persists across container restarts and upgrades.
-
-To back up the database:
-
-```bash
-docker cp js8web:/data/js8web.db ./js8web-backup.db
-```
-
-#### Stopping and restarting
-
-```bash
-docker stop js8web      # stop
-docker start js8web     # start again
-docker rm -f js8web     # remove container (data volume is preserved)
-```
-
-#### Upgrading
-
-```bash
-cd js8web
-git pull
-docker build -t js8web .
-docker rm -f js8web
-docker run -d --name js8web -p 8080:8080 -v js8web-data:/data js8web -js8call-addr <JS8CALL_HOST>:2442
-```
-
-Your database and user accounts are preserved in the `js8web-data` volume.
+Your database is stored in the `/data` volume and persists across container restarts.
 
 ---
 
 ## JS8Call Configuration
 
-Before starting js8web, ensure that JS8Call's TCP API is enabled:
+Before starting js8web, enable JS8Call's TCP API:
 
 1. Open **JS8Call**
 2. Go to **File → Settings → Reporting**
 3. Check **Enable TCP Server API**
-4. Note the **TCP Server Port** (default: `2442`)
-5. If js8web runs on a different machine, set the listening address to `0.0.0.0` or the appropriate network interface
+4. Confirm the **TCP Server Port** is `2442`
+5. If js8web runs on a different machine, set the listening address to `0.0.0.0`
 
 ---
 
 ## Running js8web
 
 ```bash
-./js8web
+./js8web -port 8081
 ```
 
 On the first run, js8web will:
-1. Create a new SQLite database file (`js8web.db` in the current directory)
-2. Set up the database schema automatically
+1. Create a SQLite database (`js8web.db`)
+2. Set up the schema automatically
 3. Create a default admin user (`admin` / `admin`)
-4. Begin attempting to connect to JS8Call at `localhost:2442`
-5. Start the web server on port `8080`
+4. Connect to JS8Call at `localhost:2442`
+5. Start the web server on the specified port (binds to all interfaces, `0.0.0.0`)
+
+Open your browser to `http://localhost:8081` (or `http://<your-ip>:8081` from another device).
 
 ### Command-Line Options
 
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-port` | `8080` | HTTP server port |
+| `-js8call-addr` | `localhost:2442` | JS8Call TCP API address |
+| `-db` | `./js8web.db` | SQLite database path |
+| `-reconnect-interval` | `5` | Seconds between reconnect attempts |
+| `-log-level` | `info` | Log level: debug / info / warn / error |
+
+All flags can also be set via environment variables (`JS8WEB_PORT`, `JS8WEB_JS8CALL_ADDR`, `JS8WEB_DB_PATH`, `JS8WEB_RECONNECT_SEC`, `JS8WEB_LOG_LEVEL`). CLI flags take precedence.
+
+### Running in the Background
+
 ```bash
-./js8web -port 9090 -js8call-addr 192.168.1.100:2442 -db /var/lib/js8web/data.db
-```
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `-js8call-addr` | JS8Call TCP API address (host:port) | `localhost:2442` |
-| `-reconnect-interval` | Seconds between reconnection attempts | `5` |
-| `-db` | Path to SQLite database file | `./js8web.db` |
-| `-port` | HTTP server port | `8080` |
-| `-log-level` | Log level: debug, info, warn, error | `info` |
-
-All options can also be set via environment variables:
-
-| Variable | Description |
-|----------|-------------|
-| `JS8WEB_JS8CALL_ADDR` | JS8Call TCP API address |
-| `JS8WEB_RECONNECT_SEC` | Reconnect interval |
-| `JS8WEB_DB_PATH` | Database file path |
-| `JS8WEB_PORT` | HTTP server port |
-| `JS8WEB_LOG_LEVEL` | Log level (debug/info/warn/error) |
-
-CLI flags take precedence over environment variables.
-
-Open your browser and navigate to:
-
-```
-http://localhost:8080
-```
-
-If accessing from another device on your network, use the IP address of the machine running js8web:
-
-```
-http://<your-ip-address>:8080
+nohup ./js8web -port 8081 > js8web.log 2>&1 &
 ```
 
 ---
 
-## Using the Web Interface
+## Login and Roles
 
-### Login
+When you open js8web you will see a login page. The default account is:
 
-When you first open js8web in your browser, you will see a login page. Enter your credentials to access the dashboard.
-
-The default account created on first run is:
 - **Username:** `admin`
 - **Password:** `admin`
 
-> ⚠️ **Change the default password** after first login using the Admin panel (see [User Management](#user-management) below).
+> ⚠️ Change the default password after first login using the Admin panel.
 
-After logging in, your session is stored as a browser cookie and will persist for 24 hours. You can log out at any time using the logout button in the status bar.
+Sessions last 24 hours and are stored in a browser cookie. Logout is available via the button in the status bar.
 
 ### User Roles
 
-js8web supports three user roles with different permission levels:
+| Role | Can view | Can send TX | Can use Inbox | Can use Rig Control | Can manage users |
+|------|----------|-------------|---------------|---------------------|-----------------|
+| **Admin** | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Operator** | ✓ | ✓ | ✓ | ✓ | — |
+| **Monitor** | ✓ | — | view only | view only | — |
 
-| Role | Permissions |
-|------|-------------|
-| **Admin** | Full access: view messages, send messages, manage users |
-| **Operator** | View messages and send messages to JS8Call |
-| **Monitor** | View messages only (read-only access) |
+---
 
-The default `admin` user has the Admin role. New users can be created with any role from the Admin panel.
+## Interface Overview
 
 ### Status Bar
 
-The top of the page shows a dark status bar with:
+The dark bar at the top shows:
 
-- **Connection indicator** — green wifi icon when connected to the server, blinking red wifi-off icon when disconnected
+- **Connection indicator** — green wifi icon when connected, blinking red when disconnected
 - **Call** — your station callsign
 - **Grid** — your grid square
 - **Dial** — current dial frequency in MHz
 - **Offset** — audio offset in Hz
-- **Speed** — JS8Call speed mode (color-coded)
+- **Speed** — JS8Call speed mode (color-coded: yellow=Normal, green=Fast, blue=Turbo, red=Slow)
 - **Selected** — currently selected callsign in JS8Call
 - **Info** — station info text
-- **User** — your logged-in username and a logout button (right side)
+- **User** — your username and a logout button
 
-The status bar updates in real time as JS8Call reports changes.
+Everything updates in real time as JS8Call reports changes.
 
 ### PTT Indicator
 
-When JS8Call is transmitting, a red **TX** banner appears below the status bar, pulsing to draw attention.
+When JS8Call is transmitting, a pulsing red **TX** banner appears below the status bar.
 
-### Connection Auto-Reconnect
+### Tab Bar
 
-If the WebSocket connection to the server is lost (network issue, server restart), js8web will automatically attempt to reconnect every 3 seconds. The status bar connection indicator will turn red and blink while disconnected. When reconnected, cached data is refreshed automatically.
+Tabs appear below the status bar. Fixed tabs:
 
-### Main Chat View
+- **All messages** — every received and transmitted message
+- **Inbox** — JS8Call's built-in message inbox
+- **Rig** — rig frequency and speed control
+- **⚙** — Settings
+- **🛡 Admin** — user management (admin only)
 
-Below the status bar, you see a chat-style interface showing JS8Call messages:
-
-- **Directed messages** (`RX.DIRECTED`) appear as chat bubbles with the sender's callsign, recipient, grid square, timestamp, and message content
-- **Messages directed to you** (`RX.DIRECTED.ME`) appear with a green background to stand out
-- **Raw activity packets** (`RX.ACTIVITY`) appear as compact lines with timestamp and decoded text (can be toggled on/off)
-- **Transmitted frames** (`TX.FRAME`) appear with a red left border, showing when your station transmitted
-
-### Message Indicators
-
-Each message displays several indicators:
-
-| Icon | Meaning |
-|------|---------|
-| 📡 Frequency (clickable) | The offset frequency of the signal. Click to open a new tab filtered to that frequency slot. |
-| 🔵→🟡→🔴 SNR | Signal-to-noise ratio. Color ranges from blue (weak, -30 dB) through yellow (moderate) to red (strong, +20 dB). |
-| ⏭ Speed | JS8Call speed mode: **S**low, **N**ormal, **F**ast, **T**urbo, **U**ltra |
-| ⏱ Time Drift | Timing drift in milliseconds |
-
-### Tabs and Filtering
-
-The interface supports a tabbed view for monitoring specific conversations:
-
-- **All messages** — default tab showing everything
-- **Callsign filter** — click the 🔍 search icon next to any callsign to open a new tab showing only messages to/from that station
-- **Frequency filter** — click any frequency indicator to open a tab filtered to that 50 Hz frequency slot
-- **Close tabs** — click the ✕ button on any filter tab to close it
-
-### Settings
-
-Click the ⚙ gear icon in the tab bar to access settings:
-
-- **Show raw packets** — toggle display of `RX.ACTIVITY` raw decoded packets alongside directed messages
-
-### Sending Messages
-
-When logged in, a message input field appears at the bottom of the chat view:
-
-1. Type your message in the input field
-2. Press **Enter** or click the **Send** button
-3. The message is sent to JS8Call's `TX.SEND_MESSAGE` API, which queues it for transmission
-4. A toast notification confirms the message was queued
-5. Once transmitted, the TX frame will appear in the chat in real-time
-
-> **Note:** Messages are sent exactly as typed. JS8Call handles the encoding and transmission. You can address specific stations using JS8Call's message format (e.g., `CALLSIGN MSG ...`).
-
-> **Note:** Sending messages requires the **Operator** or **Admin** role. Monitor users see the chat but cannot send messages.
-
-### Scrolling and History
-
-- Messages are loaded in pages of up to 100 items (including both received packets and transmitted frames)
-- **Scroll up** to load older messages automatically
-- **Scroll down** to load newer messages
-- When at the bottom of the list, new messages appear in real time
-- At the top of the history, "(No more messages)" is displayed
-- **TX frames** are now shown in historical scrolling alongside RX packets, sorted by timestamp
-
-### User Management
-
-Administrators can manage user accounts from the **Admin** tab (shield icon) in the tab bar. This tab is only visible to users with the Admin role.
-
-From the Admin panel you can:
-
-- **View all users** — see username, role, and bio for all accounts
-- **Create new users** — click "New User" to add an account with a username, password, role, and optional bio
-- **Change roles** — use the dropdown next to any user to change their role (admin/operator/monitor)
-- **Reset passwords** — click the key icon to set a new password for any user
-- **Delete users** — click the trash icon to remove an account (you cannot delete your own account)
+Dynamic tabs are created by clicking callsign or frequency indicators. Each tab can be closed with ✕.
 
 ---
 
-## Connection Status
+## Chat Tab
 
-js8web automatically connects to JS8Call and will keep retrying if the connection is lost. Check the terminal output for connection status messages:
+### Message Display
 
-```
-Connected to JS8call         — successful connection
-Disconnected from JS8call    — connection lost, will retry
-Connection to JS8call failed — cannot reach JS8Call, retrying in 5 seconds
-```
+| Message type | Appearance |
+|---|---|
+| Directed message (`RX.DIRECTED`) | Chat bubble with callsign, recipient, grid, gauges, and text |
+| Directed to you (`RX.DIRECTED.ME`) | Green background |
+| Raw activity (`RX.ACTIVITY`) | Compact packet line (toggle in Settings) |
+| Transmitted frame (`TX.FRAME`) | Red left border; shows actual message text sent |
 
-When connected, the browser will show incoming messages in real time via WebSocket. If the page is refreshed, historical messages are loaded from the database and live streaming resumes.
+Each message shows:
+- **Frequency button** (clickable) — click to open a frequency-filtered tab
+- **SNR gauge** — blue (weak) → yellow (moderate) → red (strong)
+- **Speed indicator** — S/N/F/T/U
+- **Time drift** in milliseconds
+
+### Callsign and Frequency Tabs
+
+- Click the **🔍 search icon** next to any callsign → opens a tab filtered to that callsign only; auto-activates and deduplicates (clicking the same callsign again activates the existing tab rather than creating a duplicate)
+- Click any **frequency button** → opens a 50 Hz frequency slot tab
+- Both tab types filter historical messages from the API and real-time incoming messages
+
+### Composing Messages
+
+When logged in as Operator or Admin:
+
+1. Type your message in the input field at the bottom of the chat
+2. Press **Enter** (or Shift+Enter for a newline) or click **Send**
+3. The message is sent to JS8Call's TX queue
+4. Once transmitted, it appears in the chat with the actual message text
+
+**@CALLSIGN auto-prepend:** When in a callsign-filtered tab, the compose field shows a non-editable `@CALLSIGN` prefix. The prefix is automatically prepended to your message text at send time. Switch to the "All messages" tab to send without a prefix.
+
+### Quick-Reply Buttons
+
+A row of colored buttons above the compose input provides one-tap common messages:
+
+| Default button | Default text |
+|---|---|
+| CQ | `CQ` |
+| INFO | `INFO` |
+| HOW CPY | `HOW CPY?` |
+| QSL | `QSL` |
+| 73 | `73` |
+
+Clicking a button inserts its message text at the cursor position in the compose input (or appends to the end). Buttons wrap on small screens.
+
+To customize quick-reply buttons, go to the **Settings** tab (gear icon) → **Quick Reply Buttons** section:
+
+- **Add** — create a new button
+- **Edit** — click any button preview to expand a form with Label, Color (color picker), and Message fields
+- **Reorder** — use the ↑/↓ arrows
+- **Delete** — trash icon
+- **Reset defaults** — restore the original 5 buttons
+
+Button configurations are saved to your browser's `localStorage` and persist across sessions. Button text color (black or white) is calculated automatically for readability based on the background color.
+
+### Scrolling History
+
+- Scroll up to load older messages
+- Scroll down to load newer messages
+- At the top: "(No more messages)"
+- At the bottom: live receiving indicator; new messages append automatically
+
+---
+
+## Inbox Tab
+
+The Inbox tab connects to JS8Call's built-in message inbox. Messages are fetched from JS8Call on every connection and updated in real time.
+
+### Viewing Messages
+
+The inbox shows all stored messages with:
+- **Callsign** — the sender
+- **Timestamp** — when the message was stored
+- **Message text**
+
+Messages are sorted newest first.
+
+### Sending to Inbox
+
+Operators and Admins can compose inbox messages:
+
+1. Enter the recipient's **Callsign**
+2. Type the **Message** text
+3. Click **Send** or press Ctrl+Enter
+4. The message is sent to JS8Call's `INBOX.STORE_MESSAGE` API
+
+---
+
+## Rig Control Tab
+
+The Rig tab provides real-time frequency display and one-click frequency/speed control. All values update automatically when JS8Call reports changes.
+
+### Frequency Control (Operator/Admin)
+
+**Current frequency** is shown in MHz at the top of the section.
+
+**Band presets** — one click sets the dial frequency to a common JS8Call frequency:
+
+| Button | Frequency | Band |
+|---|---|---|
+| 3.578 | 3.578 MHz | 80m |
+| 7.078 | 7.078 MHz | 40m |
+| 10.130 | 10.130 MHz | 30m |
+| 14.078 | 14.078 MHz | 20m |
+| 21.078 | 21.078 MHz | 15m |
+
+**Manual entry** — type a dial frequency in MHz and an offset in Hz, then click **Set** or press Enter.
+
+### Speed Control (Operator/Admin)
+
+Four buttons select the TX speed mode. The active mode is highlighted:
+
+| Button | JS8Call mode |
+|---|---|
+| Slow | 4 |
+| Normal | 0 (default) |
+| Fast | 1 |
+| Turbo | 2 |
+
+Monitor users see a read-only note and cannot change the speed.
+
+---
+
+## Settings Tab
+
+Click the **⚙** gear icon in the tab bar.
+
+- **Show raw packets** — toggles display of `RX.ACTIVITY` raw packets alongside directed messages
+- **Quick Reply Buttons** — configure custom quick-reply buttons (see [Quick-Reply Buttons](#quick-reply-buttons))
+
+---
+
+## Admin Tab
+
+Visible to Admin users only (🛡 shield icon).
+
+- **View all users** — username, role, bio
+- **Create new users** — set username, password, role (admin/operator/monitor), optional bio
+- **Change roles** — use the role dropdown
+- **Reset passwords** — key icon
+- **Delete users** — trash icon (you cannot delete your own account)
+
+---
+
+## Connection and Auto-Reconnect
+
+js8web automatically reconnects to JS8Call on disconnect (configurable interval, default 5 seconds). On each successful connection it sends `INBOX.GET_MESSAGES`, `RIG.GET_FREQ`, and `MODE.GET_SPEED` to refresh initial state.
+
+The browser WebSocket also auto-reconnects to the js8web server every 3 seconds if the connection drops.
 
 ---
 
 ## Database
 
-All received packets, spots, and transmitted frames are stored in a SQLite database (`js8web.db`). This file is created automatically on first run.
-
-- The database can be backed up by simply copying the file while js8web is stopped
-- To start fresh, delete the database file and restart js8web
-- The database can be queried directly using any SQLite client for custom analysis
-
-### Tables
+All messages, spots, TX frames, inbox messages, and station info are stored in `js8web.db` (SQLite).
 
 | Table | Contents |
 |-------|----------|
-| `RX_PACKET` | All received activity and directed messages |
-| `RX_SPOT` | Spot reports from other stations |
-| `TX_FRAME` | Your transmitted frames (with tone data) |
-| `STATION_INFO` | Snapshots of your station configuration |
-| `USERS` | User accounts (for future authentication) |
+| `RX_PACKET` | Received packets and directed messages |
+| `RX_SPOT` | Station spot reports |
+| `TX_FRAME` | Transmitted frames (with tone data and message text) |
+| `STATION_INFO` | Station configuration snapshots |
+| `INBOX_MESSAGE` | JS8Call inbox messages |
+| `USERS` | User accounts |
+
+**Backup:** Copy `js8web.db` while js8web is stopped.
+**Reset:** Delete `js8web.db` and restart — a fresh database and default admin user will be created.
 
 ---
 
 ## Troubleshooting
 
 ### js8web cannot connect to JS8Call
-
-- Ensure JS8Call is running and the TCP API is enabled (see [JS8Call Configuration](#js8call-configuration))
-- Verify the TCP port matches (default `2442`)
-- If running on different machines, ensure the firewall allows the connection
-- js8web will keep retrying automatically — check terminal output for errors
+- Ensure JS8Call is running and the TCP API is enabled (File → Settings → Reporting → Enable TCP Server API)
+- Verify the port is `2442`
+- Check firewall rules if running on different machines
+- js8web retries automatically — check log output for errors
 
 ### Web interface shows no messages
+- Confirm js8web is connected (check log: "Connected to JS8call")
+- Ensure JS8Call is receiving signals
+- Refresh the browser page
+- Try `curl http://localhost:8081/api/station-info` — it should return JSON
 
-- Verify js8web is connected to JS8Call (check terminal output)
-- Ensure JS8Call is receiving signals (check JS8Call's own display)
-- Try refreshing the browser page
-- Check that you can reach `http://localhost:8080/api/station-info` — it should return JSON
+### Browser shows blank page or JS errors
+- Open browser developer console (F12) for details
+- Use a modern browser supporting ES modules and import maps (Chrome 89+, Firefox 108+, Safari 16.4+)
+- Verify the URL is correct
 
-### Browser shows blank page
+### Inbox is empty
+- JS8Call's inbox may genuinely be empty
+- Check that JS8Call is connected and the TCP API is responding
+- The inbox is fetched on every js8web startup — restart js8web to trigger a fresh fetch
 
-- Check the browser's developer console (F12) for JavaScript errors
-- Ensure you're using a modern browser that supports ES modules and import maps
-- Verify the URL is correct (`http://localhost:8080`)
+### Rig controls have no effect
+- Requires Operator or Admin role
+- JS8Call must be connected (check the connection indicator in the status bar)
 
 ### Database errors on startup
-
-- If the database becomes corrupted, stop js8web, delete `js8web.db`, and restart
-- Ensure the directory is writable by the user running js8web
+- If the database is corrupted, stop js8web, delete `js8web.db`, and restart
+- Ensure the directory is writable by the process user
 
 ---
 
 ## Security Considerations
 
-> ⚠️ **js8web does not currently support HTTPS/TLS encryption.**
+> ⚠️ js8web does not currently support HTTPS/TLS.
 
-- js8web requires login to send messages — unauthenticated users cannot access the dashboard
-- The default admin password is `admin` — **change it as soon as possible**
-- Sessions are stored in server memory (not persisted) — a server restart will log out all users
-- Session cookies are `HttpOnly` and `SameSite=Strict` to mitigate XSS and CSRF
-- Do not expose js8web directly to the internet without additional protection (reverse proxy with TLS, VPN, firewall rules)
-- Consider binding to `localhost` only if remote access is not needed
+- Authentication is required to send messages and use rig/inbox controls
+- **Change the default admin/admin password immediately**
+- Sessions do not survive server restarts (in-memory only)
+- Session cookies are `HttpOnly` and `SameSite=Strict`
+- Do not expose js8web to the internet without a reverse proxy with TLS, a VPN, or firewall rules
 - All traffic including login credentials is unencrypted without HTTPS
 
 ---
 
-## Limitations (Current Version)
+## Limitations
 
-- **No HTTPS** — all traffic is unencrypted; use a reverse proxy for TLS
-- **In-memory sessions** — sessions do not survive server restarts
-- **RX spots** — spot reports are stored but not yet displayed in the UI
+- No HTTPS (use a reverse proxy for TLS)
+- In-memory sessions (do not survive restarts)
+- RX spot reports are stored but not yet displayed in the UI
+- No unit or integration tests
