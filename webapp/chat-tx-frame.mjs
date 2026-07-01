@@ -1,11 +1,12 @@
 export default {
     props: ['message'],
+    emits: ['frequencySelected'],
     template: `
         <li class="clearfix message tx-message">
             <div class="header">
                 <span class="time">{{ new Date(message.Timestamp).toLocaleString() }}</span>
                 <span class="gauges">
-                    <span class="gauge freq"><i class="bi bi-broadcast-pin"></i> {{ message.Offset }}Hz</span>
+                    <span class="gauge freq"><a class="btn btn-light btn-sm" href="#" @click.prevent="$emit('frequencySelected', message.Freq)"><i class="bi bi-broadcast-pin"></i> {{ message.Offset }}Hz</a></span>
                     <span class="gauge speed" v-if="message.Speed"><i class="bi bi-skip-end"></i><span :class="message.Speed"> {{ message.Speed[0].toUpperCase() }}</span></span>
                 </span>
                 <br />

@@ -15,6 +15,6 @@ export default {
     template: `
         <ChatRxPacket v-if="showRawPackets && message.Type === 'RX.ACTIVITY'" :message=message @frequencySelected="e => $emit('frequencySelected', e)" />
         <ChatRxMessage @callsignSelected="e => $emit('callsignSelected', e)" @frequencySelected="e => $emit('frequencySelected', e)" v-if="message.Type === 'RX.DIRECTED' || message.Type === 'RX.DIRECTED.ME'" :message=message :isDirectedToMe="message.Type === 'RX.DIRECTED.ME'" />
-        <ChatTxFrame v-if="message.Type === 'TX.FRAME'" :message=message />
+        <ChatTxFrame v-if="message.Type === 'TX.FRAME'" :message=message @frequencySelected="e => $emit('frequencySelected', e)" />
     `
 }
