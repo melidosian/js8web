@@ -1,1 +1,6 @@
-js8web.db
+# sqlite3 database
+/js8web.db
+
+# ignore executable
+/js8web
+
