@@ -209,7 +209,11 @@ export default {
         },
         insertQuickReply(rawText) {
             const grid = (this.$root.stationInfo?.Grid || '').slice(0, 4)
-            const text = rawText.replace(/\s?<MYGRID4>/g, grid ? ' ' + grid : '')
+            const info = this.$root.stationInfo?.Info || ''
+            const text = rawText
+                .replace(/\s?<MYGRID4>/g, grid ? ' ' + grid : '')
+                .replace(/\s?<MYINFO>/g, info ? ' ' + info : '')
+                .trimStart()
             const len = this.txText.length
             const start = this.savedSelection ? this.savedSelection.start : len
             const end   = this.savedSelection ? this.savedSelection.end   : len
