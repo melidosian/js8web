@@ -82,14 +82,46 @@ func sendConnectEvents(writer *bufio.Writer) {
 	}
 }
 
+// retryUnansweredRigStatus re-sends RIG.GET_FREQ / MODE.GET_SPEED a few times if
+// JS8Call never answered the connect-time request — seen in practice to sometimes
+// go unanswered (e.g. under connection-pool pressure), unlike INBOX.GET_MESSAGES,
+// which JS8Call answers reliably. Stops as soon as rigStatusCache is populated or
+// the connection drops.
+func retryUnansweredRigStatus(writer *bufio.Writer, stop <-chan struct{}) {
+	for i := 0; i < 5; i++ {
+		select {
+		case <-stop:
+			return
+		case <-time.After(4 * time.Second):
+		}
+		if rigStatusCache.Dial != 0 && rigStatusCache.Speed != "" {
+			return
+		}
+		if rigStatusCache.Dial == 0 {
+			if data, err := json.Marshal(model.Js8callEvent{Type: model.EVENT_TYPE_RIG_GET_FREQ}); err == nil {
+				writer.WriteString(string(data) + "\n")
+				writer.Flush()
+			}
+		}
+		if rigStatusCache.Speed == "" {
+			if data, err := json.Marshal(model.Js8callEvent{Type: model.EVENT_TYPE_MODE_GET_SPEED}); err == nil {
+				writer.WriteString(string(data) + "\n")
+				writer.Flush()
+			}
+		}
+	}
+}
+
 func attachEventStreamToJs8callConnection(incomingEvents chan<- model.Js8callEvent, outgoingEvents <-chan model.Js8callEvent, conn net.Conn) {
 	disconnected := make(chan int)
 	incomingJs8callEvents := make(chan model.Js8callEvent, 1)
 	outgoingJs8callEvents := make(chan model.Js8callEvent, 1)
+	stopRetry := make(chan struct{})
 
 	defer close(incomingJs8callEvents)
 	defer close(outgoingJs8callEvents)
 	defer close(disconnected)
+	defer close(stopRetry)
 
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
@@ -98,6 +130,7 @@ func attachEventStreamToJs8callConnection(incomingEvents chan<- model.Js8callEve
 
 	go readEventsFromJs8call(incomingJs8callEvents, disconnected, reader)
 	go writeEventsToJs8call(outgoingJs8callEvents, disconnected, writer)
+	go retryUnansweredRigStatus(writer, stopRetry)
 
 	for {
 		select {
