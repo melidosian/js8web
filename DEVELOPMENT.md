@@ -12,10 +12,10 @@ The goal is to provide a remote, browser-accessible dashboard for monitoring and
 
 | Layer | Technology |
 |-------|-----------|
-| Backend language | Go 1.18 |
-| Web framework | `net/http` standard library + `labstack/echo` (imported but unused currently; `net/http` `ServeMux` is the active router) |
+| Backend language | Go 1.25 |
+| Web framework | `net/http` standard library `ServeMux` |
 | WebSocket | `gorilla/websocket` |
-| Database | SQLite 3 (`mattn/go-sqlite3`) |
+| Database | SQLite 3, pure Go (`modernc.org/sqlite` — no CGo/GCC required to build) |
 | Logging | `go.uber.org/zap` |
 | Frontend framework | Vue.js 3 (ESM via CDN, no build step) |
 | CSS framework | Bootstrap 5.2 + Bootstrap Icons |
@@ -74,35 +74,44 @@ The goal is to provide a remote, browser-accessible dashboard for monitoring and
 |------|---------------|
 | `main.go` | Entry point. Initializes logger, config, DB, channels, JS8Call connection, dispatcher, WebSocket session container, and HTTP server. Handles graceful shutdown via OS signals (SIGINT/SIGTERM). |
 | `const.go` | Configuration: CLI flags, environment variable parsing, defaults. Embeds `res/initDb.sql` via `//go:embed`. Supports `-log-level` flag for configurable logging. |
-| `js8call.go` | Manages the persistent TCP connection to JS8Call. Auto-reconnects on failure. Reads newline-delimited JSON events from JS8Call and writes outgoing events. |
-| `dispatcher.go` | Central event router. Applies a fix for the ambiguous `STATION.STATUS` event. Dispatches each event type to its specific notifier function, producing `WebsocketEvent` or `DbObj` items. |
+| `js8call.go` | Manages the persistent TCP connection to JS8Call. Auto-reconnects on failure. Reads newline-delimited JSON events from JS8Call and writes outgoing events. `retryUnansweredRigStatus` re-sends `RIG.GET_FREQ`/`MODE.GET_SPEED` a few times if JS8Call didn't answer on connect (observed to happen in practice). |
+| `dispatcher.go` | Central event router. Applies a fix for the ambiguous `STATION.STATUS` event. Dispatches each event type to its specific notifier function, producing `WebsocketEvent` or `DbObj` items. Also routes `RIG.SET_FREQ`/`MODE.SET_SPEED` (JS8Call's echo of its own SET commands) to the same notifiers as the corresponding broadcast type. |
 | `rxActivity.go` | Notifier for `RX.ACTIVITY`, `RX.DIRECTED`, `RX.DIRECTED.ME` events → creates `RxPacketObj` for DB. Also handles `RX.SPOT` → creates `RxSpotObj`. |
-| `rigStatus.go` | Notifier for `RIG.STATUS` (synthesized type) → updates in-memory `rigStatusCache` and emits WS event on change. Also handles `RIG.PTT`. |
+| `rigStatus.go` | Notifier for `RIG.STATUS` (synthesized type) → updates in-memory `rigStatusCache` and emits WS event on change. Also handles `RIG.PTT` (advances the pending-TX-text queue on the PTT-on edge), `RIG.FREQ`, `MODE.SPEED`. |
 | `stationInfo.go` | Notifier for `STATION.CALLSIGN`, `STATION.GRID`, `STATION.INFO`, `STATION.STATUS` → updates in-memory `stationInfoCache`, emits WS event and persists to DB. Initializes cache from last DB record on startup. |
-| `txActivity.go` | Notifier for `TX.FRAME` → creates `TxFrameObj`, applies current rig status, saves to DB. |
-| `db.go` | SQLite database initialization. Creates file and runs `initDb.sql` if DB does not exist. Creates default admin user. |
+| `stationApi.go` | REST handlers for `POST /api/station/grid`, `/info`, `/status` — sends `STATION.SET_*` to JS8Call. |
+| `txActivity.go` | Notifier for `TX.FRAME` → creates `TxFrameObj`, applies current rig status and pending TX text, saves to DB. |
+| `pendingTx.go` | Mutex-protected FIFO queue correlating outgoing message text (from `/api/tx-message`) with the `TX.FRAME` event it produces, in send order. |
+| `inboxActivity.go` | Notifiers for `INBOX.MESSAGES` (bulk, on connect) and `INBOX.MESSAGE` (single, real-time). |
+| `inboxApi.go` | REST handlers for `GET`/`POST /api/inbox`, `POST /api/rig/freq`, `POST /api/rig/speed`. |
+| `callActivity.go` | Notifier for `RX.CALL_ACTIVITY` → in-memory `callActivityCache` (whole-snapshot replace). |
+| `bandActivity.go` | Notifier for `RX.BAND_ACTIVITY` → in-memory `bandActivityCache` (whole-snapshot replace). |
+| `db.go` | SQLite database initialization (`modernc.org/sqlite`, pure Go). Creates file and runs `initDb.sql` if DB does not exist. Creates default admin user. `runMigrations()` applies idempotent schema changes on every startup. |
 | `webappServer.go` | HTTP server setup. Registers REST API routes (including auth and TX message endpoints), WebSocket endpoint, and static file handler for the embedded webapp. Implements method routing and auth middleware integration. |
-| `api.go` | REST API handler functions: `GET /api/station-info`, `GET /api/rig-status`, `GET /api/rx-packets`, `GET /api/chat-messages` (combined RX+TX history), `POST /api/tx-message` (sends message to JS8Call). |
-| `auth.go` | Authentication system: cookie-based session management, login/logout/check API handlers, `authRequired` and `roleRequired` middleware. Sessions are stored in-memory with 24-hour expiry. |
+| `api.go` | REST API handlers: station info, rig status, call/band activity, rx-packets, chat-messages, tx-message. |
+| `auth.go` | Authentication system: cookie-based session management, login/logout/check API handlers, `authRequired`, `roleRequired`, and `methodRoleRequired` (per-method role check within a single route) middleware. Sessions are stored in-memory with 24-hour expiry. |
 | `userApi.go` | User management API: list, create, update, delete users, change passwords. Admin-only endpoints. |
 | `websocket.go` | WebSocket upgrade handler and session management. Each connected browser gets a session; all sessions receive broadcast messages. |
-| `Dockerfile` | Multi-stage Docker build: Go 1.18 builder compiles the binary, then copies it into a minimal `debian:bullseye-slim` runtime image. Exposes port 8080, uses `/data` volume for the database. |
+| `Dockerfile` | Multi-stage Docker build: Go 1.25 builder compiles the binary (no CGo needed), then copies it into a minimal `debian:bookworm-slim` runtime image. Exposes port 8080, uses `/data` volume for the database. |
 | `.dockerignore` | Excludes build artifacts, database files, docs, and IDE files from Docker build context. |
 
 ### Model Package (`model/`)
 
 | File | Responsibility |
 |------|---------------|
-| `js8callEvent.go` | Defines `Js8callEvent` and `Js8callEventParams` structs (JSON mapping of JS8Call TCP API). Declares all event type constants and WS type constants. Helper functions for channel calculation and speed naming. |
+| `js8callEvent.go` | Defines `Js8callEvent` and `Js8callEventParams` structs (JSON mapping of JS8Call TCP API). Custom `UnmarshalJSON` routes `params` into `Params` for most event types, or into `CallActivity`/`BandActivity` for the two whose `params` is a dict keyed by callsign/offset instead of the usual fixed shape. Declares all event type constants and WS type constants. `CalcChannelFromOffset`, `SpeedName` helpers. |
 | `db.go` | Defines `DbObj` interface: objects that can be `Save()`d to DB and have a `WsType()`. |
 | `websocketEvent.go` | Defines `WebsocketEvent` interface (anything with `WsType()`). |
 | `websocketMessage.go` | Defines `WebsocketMessage` struct sent over WebSocket to browsers. |
 | `rxPacket.go` | `RxPacketObj` — model for received packets. Insert, Scan, query logic. Supports filtered listing with pagination by timestamp (before/after). |
 | `rxSpot.go` | `RxSpotObj` — model for RX spot reports. Insert logic. Stub for listing by days. |
-| `txFrame.go` | `TxFrameObj` — model for transmitted frames. Stores tone data as JSON. Applies rig status before saving. Supports filtered listing with pagination by timestamp. |
+| `txFrame.go` | `TxFrameObj` — model for transmitted frames, including `Text` (the actual transmitted message text, correlated via the pending-TX-text queue). Applies rig status before saving. Supports filtered listing with pagination by timestamp. |
 | `rigStatus.go` | `RigStatusWsEvent` — in-memory rig status (dial freq, offset, speed, selected callsign). Not persisted. |
 | `rigPtt.go` | `RigPttWsEvent` — PTT on/off event for WebSocket broadcast. |
-| `stationInfo.go` | `StationInfoObj` / `StationInfoWsEvent` — station callsign, grid, info, status. Persisted with a "latest" flag pattern. |
+| `stationInfo.go` | `StationInfoObj` / `StationInfoWsEvent` — station grid, info, status (callsign is read-only in JS8Call's API, not settable). Persisted with a "latest" flag pattern. |
+| `inboxMessage.go` | `InboxMessageObj` — JS8Call inbox message model. `INSERT OR IGNORE` with `UNIQUE(CALLSIGN, UTC_MS, MESSAGE)` for dedup; detects the no-op via `RowsAffected()`, not `LastInsertId()` (SQLite doesn't reset the latter on a skipped insert). |
+| `callActivity.go` | `CallActivityWsEvent` (`map[string]CallActivityEntry`, keyed by callsign) — JS8Call's call activity window snapshot. |
+| `bandActivity.go` | `BandActivityWsEvent` (`map[string]BandActivityEntry`, keyed by offset) — JS8Call's band activity window snapshot. |
 | `user.go` | `User` model with SHA-256 password hashing. Default admin/admin user. Roles: admin, monitor, operator. `FetchUserByName` and `FetchUserById` for lookups. `FetchAllUsers`, `UpdateUser`, `UpdateUserPassword`, `DeleteUser` for management. `UserPublic` for safe serialization. |
 | `utils.go` | Time conversion helpers: JS8Call millisecond timestamps ↔ `time.Time` ↔ SQLite RFC3339 strings. |
 | `chatMessage.go` | `ChatMessage` — unified wrapper for RX packets and TX frames. `FetchChatMessages` merges both types, sorted by timestamp, for the chat API. |
@@ -114,8 +123,11 @@ The goal is to provide a remote, browser-accessible dashboard for monitoring and
 | `USERS` | User accounts (name, password hash, role, bio) |
 | `RX_PACKET` | Every received packet: timestamp, type, frequency info, SNR, speed, grid, from/to callsigns, text content, command/extra fields |
 | `RX_SPOT` | Spot reports: call, grid, SNR, frequency info |
-| `TX_FRAME` | Transmitted frames: frequency info, mode, speed, selected callsign, tone data |
+| `TX_FRAME` | Transmitted frames: frequency info, mode, speed, selected callsign, tone data, `TEXT` (actual transmitted message) |
 | `STATION_INFO` | Station metadata snapshots: callsign, grid, info, status. Uses `LATEST=1` flag for current. |
+| `INBOX_MESSAGE` | JS8Call inbox messages: timestamp, callsign, message, UTC ms. `UNIQUE(CALLSIGN, UTC_MS, MESSAGE)` for dedup. |
+
+Call/band activity are in-memory only (whole-snapshot caches, not persisted) since JS8Call itself already treats them as live windows, not a log.
 
 All timestamp-bearing tables have indexes on `TIMESTAMP`.
 
@@ -127,16 +139,26 @@ All timestamp-bearing tables have indexes on `TIMESTAMP`.
 | `app.mjs` | Root Vue component. Manages authentication state (login/logout). Fetches initial station info and rig status via REST API. Opens WebSocket with auto-reconnect logic (3s interval). Updates local state for station info, rig status, and PTT from WebSocket events. Dispatches events to child components via browser `CustomEvent`s. |
 | `login-page.mjs` | Login form component. Submits credentials to `POST /api/auth/login`. Emits `login` event on success with username and role. |
 | `toast-container.mjs` | Toast notification system. Displays success/error/warning/info messages with auto-dismiss (3s for success, 6s for errors). |
-| `status-bar.mjs` | Status bar component showing connection state (wi-fi icon), station callsign, grid, dial frequency, offset, speed mode, selected callsign, station info, logged-in user, and logout button. |
-| `chat-window.mjs` | Tab management component. Default "All messages" tab + dynamic filter tabs (by callsign or frequency). Settings tab with "show raw packets" toggle. Admin tab with user management (admin role only). |
-| `chat.mjs` | Core chat/message list component. Infinite scroll (loads older/newer pages). Listens for `RX.PACKET` and `TX.FRAME` WebSocket events and appends new messages in real-time. Uses `/api/chat-messages` for combined RX+TX history. Applies client-side filtering. Includes message input field for sending messages to JS8Call (visible to operator and admin roles). |
+| `status-bar.mjs` | Status bar: connection indicator, dial frequency, offset, speed mode, selected callsign, logged-in user, logout button. (Station callsign/grid/info live under Settings > Station Details instead.) |
+| `chat-window.mjs` | Tab manager. Default "All messages" tab + dynamic filter tabs (by callsign or frequency) + fixed Inbox/Rig/Calls/Band/Settings/Admin tabs. Owns quick-reply state (persisted to localStorage). |
+| `chat.mjs` | Core chat/message list component. Infinite scroll (loads older/newer pages, auto-continues if a page is fully filtered out e.g. by the hide-heartbeat toggle). Listens for `RX.PACKET` and `TX.FRAME` WebSocket events and appends new messages in real-time. Uses `/api/chat-messages` for combined RX+TX history. Applies client-side filtering. Quick-reply button bar and message input (visible to operator and admin roles); `@CALLSIGN` auto-prepended when composing in a callsign-filtered tab. |
 | `chat-message.mjs` | Router component: renders `ChatRxPacket` for raw `RX.ACTIVITY`, `ChatRxMessage` for `RX.DIRECTED`/`RX.DIRECTED.ME` messages, and `ChatTxFrame` for transmitted frames. |
 | `chat-rx-message.mjs` | Renders a directed message with sender callsign, recipient, grid, timestamp, SNR/speed/drift gauges, and message text. Messages directed to own station are visually highlighted. |
 | `chat-rx-packet.mjs` | Renders a raw activity packet with timestamp and gauges. |
-| `chat-tx-frame.mjs` | Renders a transmitted frame indicator with timestamp, frequency, speed, and selected callsign. |
-| `chat-rx-header-icons.mjs` | Reusable gauge icons: frequency (clickable to filter), SNR (color-coded blue→yellow→red), speed indicator, time drift. |
+| `chat-tx-frame.mjs` | Renders a transmitted frame: actual transmitted text, clickable frequency button, speed, selected callsign. |
+| `chat-rx-header-icons.mjs` | Reusable gauge icons: frequency (clickable to filter), SNR (color-coded, via `snr-color.mjs`), speed indicator, time drift. |
+| `snr-color.mjs` | Shared `snrColor(snr)` blue→yellow→red gradient helper, used by the chat gauges and the Calls/Band activity tables. |
+| `quick-replies.mjs` | Shared quick-reply helpers: defaults, localStorage load/save, `textColorForBg` (YIQ luminance for button text contrast). |
+| `quick-reply-bar.mjs` | Horizontal one-tap reply button bar above the compose input. |
+| `quick-reply-settings.mjs` | Settings UI to add/edit/reorder/delete quick-reply buttons with live color preview. |
+| `inbox.mjs` | Inbox tab: compose form (callsign + message), scrollable list of JS8Call's stored inbox messages, real-time updates. |
+| `inbox-message.mjs` | Single inbox message: callsign, timestamp, message body. |
+| `rig.mjs` | Rig Control tab: live frequency/speed display, band presets, offset slider (200-3000 Hz), TX speed buttons. Both frequency and offset inputs pre-fill from live rig status and stop auto-filling once the user touches a field, so adjusting one doesn't require re-entering the other. |
+| `call-activity.mjs` | Calls tab: table of currently-heard callsigns (grid, SNR, last heard) from JS8Call's call activity window; click a callsign to open a filtered chat tab. |
+| `band-activity.mjs` | Band tab: table of current band activity by offset (SNR, decoded text, last heard); click an offset to open a frequency-filtered chat tab. |
+| `station-details.mjs` | Settings > Station Details: edit grid/info/status, saved directly to JS8Call. |
 | `admin-users.mjs` | Admin panel for user management. List all users, create new users, change roles, reset passwords, delete users. Only accessible to admin role. |
-| `style.css` | Chat-style layout. Flex-based full-height UI. Message bubbles, gauge styling, speed-color classes. Mobile-responsive media queries. |
+| `style.css` | Chat-style layout. Flex-based full-height UI. Message bubbles, gauge styling, speed-color classes, activity tables, mobile-responsive media queries. |
 
 ---
 
@@ -167,11 +189,20 @@ All timestamp-bearing tables have indexes on `TIMESTAMP`.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `GET /api/station-info` | GET | Returns current station info (callsign, grid, info, status) from in-memory cache. |
+| `GET /api/station-info` | GET | Returns current station info (grid, info, status) from in-memory cache. Callsign is not included — JS8Call's API exposes no way to set it, so it isn't editable/shown here. |
 | `GET /api/rig-status` | GET | Returns current rig status (dial, freq, offset, channel, speed, selected) from in-memory cache. |
+| `GET /api/call-activity` | GET | Returns the current call activity snapshot (map keyed by callsign) from in-memory cache. |
+| `GET /api/band-activity` | GET | Returns the current band activity snapshot (map keyed by offset) from in-memory cache. |
 | `GET /api/rx-packets` | GET | Returns up to 100 RX packets. Params: `startTime` (RFC3339), `direction` (`before`/`after`), optional `filter` (JSON with `Callsign` and/or `Freq.From`/`Freq.To`). |
 | `GET /api/chat-messages` | GET | Returns up to 100 combined RX packets and TX frames, sorted by timestamp. Same params as `/api/rx-packets`. |
 | `POST /api/tx-message` | POST | Sends a text message to JS8Call. Requires operator or admin role. Body: `{"text": "..."}`. |
+| `GET /api/inbox` | GET | Returns all stored inbox messages, newest first. Requires authentication. |
+| `POST /api/inbox` | POST | Stores a message in JS8Call's inbox. Requires operator or admin role. Body: `{"callsign": "...", "message": "..."}`. |
+| `POST /api/rig/freq` | POST | Sets rig dial frequency and offset. Requires operator or admin role. Body: `{"dial": <Hz>, "offset": <Hz>}`. |
+| `POST /api/rig/speed` | POST | Sets TX speed mode. Requires operator or admin role. Body: `{"speed": <code>}`. |
+| `POST /api/station/grid` | POST | Sets station grid. Requires operator or admin role. Body: `{"value": "..."}`. |
+| `POST /api/station/info` | POST | Sets station info/QTH text. Requires operator or admin role. Body: `{"value": "..."}`. |
+| `POST /api/station/status` | POST | Sets station status message. Requires operator or admin role. Body: `{"value": "..."}`. |
 | `POST /api/auth/login` | POST | Authenticates user. Body: `{"username": "...", "password": "..."}`. Returns session cookie. |
 | `POST /api/auth/logout` | POST | Clears session cookie and invalidates server-side session. |
 | `GET /api/auth/check` | GET | Checks if current session is valid. Returns `{"ok": true/false, "username": "...", "role": "..."}`. |
@@ -210,7 +241,7 @@ Run `./js8web -help` to see all options.
 ## Build & Run
 
 ```bash
-# Prerequisites: Go 1.18+, GCC (for CGo/SQLite)
+# Prerequisites: Go 1.25+ (pure-Go SQLite driver, no CGo/GCC needed)
 go build -o js8web .
 ./js8web
 ```
@@ -230,7 +261,7 @@ The webapp is embedded in the binary — no separate deployment needed.
 - REST API for station info, rig status, and paginated RX packet listing with filters
 - WebSocket broadcast of real-time events to all connected browsers
 - Vue 3 SPA with chat-style message display
-- **Status bar** showing callsign, grid, dial frequency, offset, speed, selected callsign, and station info
+- **Status bar** showing dial frequency, offset, speed, selected callsign
 - **Connection status indicator** (green wifi icon when connected, blinking red when disconnected)
 - **WebSocket auto-reconnect** (3-second interval) with automatic data refresh on reconnect
 - **PTT indicator** — red banner when transmitting
@@ -258,6 +289,13 @@ The webapp is embedded in the binary — no separate deployment needed.
 - **User management** — admin panel with full CRUD: list users, create accounts, change roles, reset passwords, delete users (admin only)
 - **Mobile-responsive layout** — CSS media queries for proper display on small screens (status bar wrapping, touch targets, scrollable tabs)
 - **Docker container** — multi-stage Dockerfile for easy deployment; `/data` volume for persistent database
+- **Pure-Go SQLite** (`modernc.org/sqlite`) — no CGo/GCC required to build
+- **Quick-reply button bar** — configurable one-tap reply buttons (label/color/message), persisted to localStorage, editable in Settings
+- **Inbox tab** — view JS8Call's stored inbox messages and store new ones, with real-time updates
+- **Rig Control tab** — band presets, offset slider, TX speed buttons; both frequency and offset fields pre-fill from and stay in sync with live rig status
+- **Calls tab** / **Band tab** — live tables of JS8Call's call/band activity windows, updating over the websocket
+- **Station Details settings** — edit grid/info/status directly from js8web (callsign is read-only in JS8Call's API, so it's not editable here)
+- **Hide-heartbeat filter** — hides incoming `HEARTBEAT` messages from chat, with infinite scroll adjusted so a fully-filtered page doesn't stall pagination
 
 ### 🚧 Partially Implemented / Stubbed
 

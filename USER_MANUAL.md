@@ -10,7 +10,11 @@ js8web is a web-based monitor and control interface for [JS8Call](http://js8call
 - Quick-reply button bar for one-tap common messages (fully configurable)
 - Automatic `@CALLSIGN` prefixing when composing in a filtered tab
 - Inbox tab for JS8Call's built-in message store
-- Rig Control tab for tuning frequency and TX speed
+- Rig Control tab for tuning frequency (with offset slider) and TX speed
+- Calls tab showing currently-heard callsigns (grid, SNR, last heard)
+- Band tab showing current band activity by offset (SNR, decoded text, last heard)
+- Station Details settings to edit grid/info/status from the Settings tab
+- Hide-heartbeat filter to hide incoming HEARTBEAT messages
 - TX messages show actual transmitted text in the chat
 - Color-coded SNR, speed, and drift indicators
 - Mobile-friendly layout with 44px+ touch targets
@@ -138,16 +142,13 @@ Sessions last 24 hours and are stored in a browser cookie. Logout is available v
 The dark bar at the top shows:
 
 - **Connection indicator** — green wifi icon when connected, blinking red when disconnected
-- **Call** — your station callsign
-- **Grid** — your grid square
 - **Dial** — current dial frequency in MHz
 - **Offset** — audio offset in Hz
 - **Speed** — JS8Call speed mode (color-coded: yellow=Normal, green=Fast, blue=Turbo, red=Slow)
 - **Selected** — currently selected callsign in JS8Call
-- **Info** — station info text
 - **User** — your username and a logout button
 
-Everything updates in real time as JS8Call reports changes.
+Everything updates in real time as JS8Call reports changes. Your station's callsign, grid, and info text are shown/editable under Settings > Station Details instead of the status bar.
 
 ### PTT Indicator
 
@@ -160,7 +161,9 @@ Tabs appear below the status bar. Fixed tabs:
 - **All messages** — every received and transmitted message
 - **Inbox** — JS8Call's built-in message inbox
 - **Rig** — rig frequency and speed control
-- **⚙** — Settings
+- **Calls** — currently-heard callsigns
+- **Band** — current band activity by offset
+- **⚙** — Settings (includes Station Details)
 - **🛡 Admin** — user management (admin only)
 
 Dynamic tabs are created by clicking callsign or frequency indicators. Each tab can be closed with ✕.
@@ -276,7 +279,7 @@ The Rig tab provides real-time frequency display and one-click frequency/speed c
 | 14.078 | 14.078 MHz | 20m |
 | 21.078 | 21.078 MHz | 15m |
 
-**Manual entry** — type a dial frequency in MHz and an offset in Hz, then click **Set** or press Enter.
+**Manual entry** — type a dial frequency in MHz, drag the offset slider (200-3000 Hz), then click **Set** or press Enter in the MHz field. Both fields pre-fill from the current rig status, so adjusting just one doesn't require re-entering the other; band presets only change the dial frequency and leave your current offset untouched.
 
 ### Speed Control (Operator/Admin)
 
@@ -293,11 +296,29 @@ Monitor users see a read-only note and cannot change the speed.
 
 ---
 
+## Calls Tab
+
+A live table of every callsign JS8Call has currently heard: grid square, color-coded SNR, and last-heard time. Click a callsign's 🔍 icon to open a chat tab filtered to that callsign, same as elsewhere in the app.
+
+The table reflects JS8Call's own call activity window and updates over the websocket as JS8Call reports changes.
+
+---
+
+## Band Tab
+
+A live table of current band activity by offset: SNR, the last decoded text at that offset, and last-heard time. Click an offset to open a frequency-filtered chat tab.
+
+Reflects JS8Call's own band activity window; updates the same way as the Calls tab.
+
+---
+
 ## Settings Tab
 
 Click the **⚙** gear icon in the tab bar.
 
 - **Show raw packets** — toggles display of `RX.ACTIVITY` raw packets alongside directed messages
+- **Hide incoming heartbeat messages** — hides `HEARTBEAT` messages from the chat view
+- **Station Details** — edit your grid square, station info (rig/antenna/location), and status message; saved directly to JS8Call. Your callsign isn't shown here since JS8Call's API doesn't expose a way to set it
 - **Quick Reply Buttons** — configure custom quick-reply buttons (see [Quick-Reply Buttons](#quick-reply-buttons))
 
 ---
@@ -316,7 +337,7 @@ Visible to Admin users only (🛡 shield icon).
 
 ## Connection and Auto-Reconnect
 
-js8web automatically reconnects to JS8Call on disconnect (configurable interval, default 5 seconds). On each successful connection it sends `INBOX.GET_MESSAGES`, `RIG.GET_FREQ`, and `MODE.GET_SPEED` to refresh initial state.
+js8web automatically reconnects to JS8Call on disconnect (configurable interval, default 5 seconds). On each successful connection it requests inbox messages, rig frequency/speed, station details, and call/band activity to refresh initial state. JS8Call doesn't always answer the frequency/speed requests on the first try, so js8web retries those a few times before giving up.
 
 The browser WebSocket also auto-reconnects to the js8web server every 3 seconds if the connection drops.
 

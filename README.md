@@ -26,14 +26,18 @@ go build -o js8web .
 - **Quick-reply buttons** — configurable one-tap reply buttons (CQ, INFO, HOW CPY, QSL, 73) with custom labels, colors, and message text; saved in browser localStorage; editable via Settings tab
 - **TX message display** — transmitted messages show their actual text in the chat (not just "Transmitted frame")
 - **Inbox tab** — view and send messages to JS8Call's built-in inbox; updates in real time
-- **Rig Control tab** — set dial frequency (with 5 band presets: 80/40/30/20/15m), set TX speed mode (Slow/Normal/Fast/Turbo)
+- **Rig Control tab** — set dial frequency (with 5 band presets: 80/40/30/20/15m), offset slider, TX speed mode (Slow/Normal/Fast/Turbo)
+- **Calls tab** — live table of heard callsigns (grid, SNR, last heard) from JS8Call's call activity window
+- **Band tab** — live table of current band activity by offset (SNR, decoded text, last heard)
+- **Station Details settings** — edit grid/info/status directly from js8web (JS8Call's callsign is read-only, not shown)
+- **Hide-heartbeat filter** — optionally hide incoming HEARTBEAT messages from chat
 - **Color-coded signal indicators** — SNR (blue→yellow→red), speed mode, time drift
 - **Infinite scroll** — paginated message history loading
 - **Mobile-friendly** — responsive layout, 44px+ touch targets on the tab bar and rig control buttons
 - **Authentication** — cookie-based sessions; Admin/Operator/Monitor roles
 - **User management** — admin panel for creating, editing, and deleting user accounts
 - **SQLite persistence** — all activity logged; survives restarts
-- **Single binary** — embedded web interface; no runtime dependencies
+- **Single binary, pure Go** — embedded web interface; no CGo/GCC required to build
 
 ## Documentation
 
@@ -47,6 +51,8 @@ go build -o js8web .
 |----------|--------|-------------|
 | `/api/station-info` | GET | Current station info (callsign, grid, info, status) |
 | `/api/rig-status` | GET | Current rig status (dial, freq, offset, speed, selected) |
+| `/api/call-activity` | GET | Current call activity snapshot (keyed by callsign) |
+| `/api/band-activity` | GET | Current band activity snapshot (keyed by offset) |
 | `/api/chat-messages` | GET | Paginated RX packets + TX frames merged by timestamp |
 | `/api/rx-packets` | GET | Paginated RX packets only |
 | `/api/tx-message` | POST | Send message to JS8Call (operator/admin) |
@@ -54,6 +60,9 @@ go build -o js8web .
 | `/api/inbox` | POST | Store message in JS8Call inbox (operator/admin) |
 | `/api/rig/freq` | POST | Set dial frequency in Hz (operator/admin) |
 | `/api/rig/speed` | POST | Set TX speed mode (operator/admin) |
+| `/api/station/grid` | POST | Set station grid (operator/admin) |
+| `/api/station/info` | POST | Set station info/QTH (operator/admin) |
+| `/api/station/status` | POST | Set station status message (operator/admin) |
 | `/api/auth/login` | POST | Login |
 | `/api/auth/logout` | POST | Logout |
 | `/api/auth/check` | GET | Check current session |
