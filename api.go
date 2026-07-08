@@ -82,6 +82,17 @@ func apiBandActivityGet(w http.ResponseWriter, req *http.Request, db *sql.DB) {
 	w.Write(bandActivityJson)
 }
 
+func apiRxSpotsGet(w http.ResponseWriter, req *http.Request, db *sql.DB) {
+	spots, err := model.FetchRecentRxSpots(db)
+	if err != nil {
+		logger.Sugar().Errorw("Cannot fetch rx spots", "error", err)
+		http.Error(w, "cannot fetch rx spots", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(spots)
+}
+
 func apiRxPacketsGet(w http.ResponseWriter, req *http.Request, db *sql.DB) {
 	q := req.URL.Query()
 	if !q.Has("startTime") {

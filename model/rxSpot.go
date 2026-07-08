@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	SQL_RX_SPOT_INSERT    = "INSERT INTO `RX_SPOT` (`TIMESTAMP`, `CALL`, `GRID`, `SNR`, `CHANNEL`, `DIAL`, `FREQ`, `OFFSET`) values(?, ?, ?, ?, ?, ?, ?, ?)"
-	SQL_RX_SPOT_LIST_DAYS = "SELECT date(`TIMESTAMP`) FROM `RX_SPOT` ORDER BY date(`TIMESTAMP`) LIMIT ? OFFSET ?"
+	SQL_RX_SPOT_INSERT = "INSERT INTO `RX_SPOT` (`TIMESTAMP`, `CALL`, `GRID`, `SNR`, `CHANNEL`, `DIAL`, `FREQ`, `OFFSET`) values(?, ?, ?, ?, ?, ?, ?, ?)"
+	SQL_RX_SPOT_LIST   = "SELECT `ID`, `TIMESTAMP`, `CALL`, `GRID`, `SNR`, `CHANNEL`, `DIAL`, `FREQ`, `OFFSET` FROM `RX_SPOT` ORDER BY `TIMESTAMP` DESC LIMIT 200"
 )
 
 type RxSpotObj struct {
@@ -34,7 +34,9 @@ func CreateRxSpotObj(event *Js8callEvent) (*RxSpotObj, error) {
 	}
 
 	o := new(RxSpotObj)
-	o.Timestamp = fromJs8Timestamp(event.Params.UTC)
+	// RX.SPOT carries no timestamp field at all (unlike RX.ACTIVITY/RX.DIRECTED) — stamp
+	// it with our own receive time instead of the always-zero event.Params.UTC.
+	o.Timestamp = time.Now().UTC()
 	o.Call = event.Params.Call
 	o.Grid = event.Params.Grid
 	o.Snr = event.Params.Snr
@@ -75,6 +77,47 @@ func (obj *RxSpotObj) Save(db *sql.DB) error {
 	return obj.Insert(db)
 }
 
-func RxSpotListDays(limit int, offset int) {
+func (obj *RxSpotObj) Scan(rows *sql.Rows) error {
+	var timestamp string
+	err := rows.Scan(
+		&obj.Id,
+		&timestamp,
+		&obj.Call,
+		&obj.Grid,
+		&obj.Snr,
+		&obj.Channel,
+		&obj.Dial,
+		&obj.Freq,
+		&obj.Offset,
+	)
+	if err != nil {
+		return err
+	}
 
+	obj.Timestamp, err = fromSqlTime(timestamp)
+	return err
+}
+
+// FetchRecentRxSpots returns the most recent spots, newest first. Spots are a live/recent
+// activity view (matching JS8Call's own spot window) rather than a deep historical log, so
+// this is a bounded recent list rather than before/after pagination.
+func FetchRecentRxSpots(db *sql.DB) ([]RxSpotObj, error) {
+	l := make([]RxSpotObj, 0)
+
+	rows, err := db.Query(SQL_RX_SPOT_LIST)
+	if err != nil {
+		return l, fmt.Errorf("error querying rx spots, caused by %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		obj := RxSpotObj{}
+		if err := obj.Scan(rows); err != nil {
+			return l, err
+		}
+		obj.Call = trim(obj.Call)
+		obj.Grid = trim(obj.Grid)
+		l = append(l, obj)
+	}
+	return l, rows.Err()
 }

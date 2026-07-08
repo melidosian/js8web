@@ -29,6 +29,7 @@ go build -o js8web .
 - **Rig Control tab** — set dial frequency (with 5 band presets: 80/40/30/20/15m), offset slider, TX speed mode (Slow/Normal/Fast/Turbo)
 - **Calls tab** — live table of heard callsigns (grid, SNR, last heard) from JS8Call's call activity window
 - **Band tab** — live table of current band activity by offset (SNR, decoded text, last heard)
+- **Spots tab** — map (grid-derived location) and list of received station spots, color-coded by SNR
 - **Station Details settings** — edit grid/info/status directly from js8web (JS8Call's callsign is read-only, not shown)
 - **Hide-heartbeat filter** — optionally hide incoming HEARTBEAT messages from chat
 - **Color-coded signal indicators** — SNR (blue→yellow→red), speed mode, time drift
@@ -42,34 +43,8 @@ go build -o js8web .
 ## Documentation
 
 - **[User Manual](USER_MANUAL.md)** — installation, configuration, and full usage guide
-- **[Development Documentation](DEVELOPMENT.md)** — architecture, code reference, API docs
+- **[Development Documentation](DEVELOPMENT.md)** — architecture, code reference, API endpoints
 - **[CLAUDE.md](CLAUDE.md)** — agent rules and codebase guide (for AI-assisted development)
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/station-info` | GET | Current station info (callsign, grid, info, status) |
-| `/api/rig-status` | GET | Current rig status (dial, freq, offset, speed, selected) |
-| `/api/call-activity` | GET | Current call activity snapshot (keyed by callsign) |
-| `/api/band-activity` | GET | Current band activity snapshot (keyed by offset) |
-| `/api/chat-messages` | GET | Paginated RX packets + TX frames merged by timestamp |
-| `/api/rx-packets` | GET | Paginated RX packets only |
-| `/api/tx-message` | POST | Send message to JS8Call (operator/admin) |
-| `/api/inbox` | GET | All inbox messages, newest first (auth required) |
-| `/api/inbox` | POST | Store message in JS8Call inbox (operator/admin) |
-| `/api/rig/freq` | POST | Set dial frequency in Hz (operator/admin) |
-| `/api/rig/speed` | POST | Set TX speed mode (operator/admin) |
-| `/api/station/grid` | POST | Set station grid (operator/admin) |
-| `/api/station/info` | POST | Set station info/QTH (operator/admin) |
-| `/api/station/status` | POST | Set station status message (operator/admin) |
-| `/api/auth/login` | POST | Login |
-| `/api/auth/logout` | POST | Logout |
-| `/api/auth/check` | GET | Check current session |
-| `/api/users` | GET/POST | List / create users (admin) |
-| `/api/users/{id}` | GET/PUT/DELETE | Get / update / delete user (admin) |
-| `/api/users/{id}/password` | PUT | Change user password (admin) |
-| `/ws/events` | WS | Real-time event stream |
 
 ## License
 

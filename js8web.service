@@ -1,0 +1,28 @@
+[Unit]
+Description=js8web - web monitor and control interface for JS8Call
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=js8web
+Group=js8web
+WorkingDirectory=/opt/js8web
+ExecStart=/opt/js8web/js8web
+Restart=on-failure
+RestartSec=5
+
+# Uncomment and edit to override defaults (see README/USER_MANUAL for all flags):
+# Environment=JS8WEB_PORT=8080
+# Environment=JS8WEB_JS8CALL_ADDR=localhost:2442
+# Environment=JS8WEB_DB_PATH=/opt/js8web/js8web.db
+# Environment=JS8WEB_LOG_LEVEL=info
+
+# Hardening (safe defaults for a single-purpose service; relax if it causes issues)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/js8web
+
+[Install]
+WantedBy=multi-user.target

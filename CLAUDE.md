@@ -98,6 +98,7 @@ Default login: **admin / admin**
 | `callActivity.go` | `CallActivityWsEvent` (`map[string]CallActivityEntry`, keyed by callsign), `CallActivityEntry` (Grid/Snr/UTC). |
 | `bandActivity.go` | `BandActivityWsEvent` (`map[string]BandActivityEntry`, keyed by offset), `BandActivityEntry` (Dial/Freq/Offset/Snr/Text/UTC). |
 | `rxPacket.go` | `RxPacketObj`, `RxPacketFilter`, SQL, fetch/scan logic with callsign + frequency filtering. |
+| `rxSpot.go` | `RxSpotObj`; `FetchRecentRxSpots` returns the 200 most recent, newest first. `RX.SPOT` has no timestamp field at all, so `CreateRxSpotObj` stamps `time.Now()` instead. |
 | `txFrame.go` | `TxFrameObj` with `Text` field (for displaying transmitted message text). |
 | `chatMessage.go` | `ChatMessage` unified wrapper; `FetchChatMessages` merges RX packets + TX frames sorted by timestamp. |
 | `inboxMessage.go` | `InboxMessageObj`; `INSERT OR IGNORE` with UNIQUE(CALLSIGN, UTC_MS, MESSAGE) for dedup; `FetchInboxMessages`. |
@@ -143,7 +144,9 @@ Default login: **admin / admin**
 | `snr-color.mjs` | Shared `snrColor(snr)` gradient helper (blue→yellow→red), used by chat gauges and the activity tabs. |
 | `call-activity.mjs` | Calls tab: table of heard callsigns (grid, SNR, last heard) from JS8Call's call activity window; click a callsign to open a filtered chat tab. |
 | `band-activity.mjs` | Band tab: table of current band activity by offset (SNR, text, last heard); click an offset to open a frequency-filtered chat tab. |
-| `style.css` | All CSS: status bar, chat layout, message bubbles, gauges, quick-reply bar, inbox, rig panel, activity tables, mobile responsive. |
+| `grid-to-latlon.mjs` | Converts a Maidenhead grid locator (4 or 6 chars) to the approximate lat/lon of its center. Pure function. |
+| `spots.mjs` | Spots tab: Leaflet map (one marker per callsign, most recent spot, SNR color-coded via `snr-color.mjs`) + list of the 200 most recent spots. Leaflet is loaded via the `leaflet` import map entry in `index.html` (named exports only — `import { map, tileLayer, circleMarker, layerGroup } from 'leaflet'`, no `L` namespace object). |
+| `style.css` | All CSS: status bar, chat layout, message bubbles, gauges, quick-reply bar, inbox, rig panel, activity tables, spots map/list, mobile responsive. |
 
 ---
 
@@ -155,6 +158,7 @@ Default login: **admin / admin**
 | GET | `/api/rig-status` | none | Current rig status from cache |
 | GET | `/api/call-activity` | none | Current call activity snapshot from cache (keyed by callsign) |
 | GET | `/api/band-activity` | none | Current band activity snapshot from cache (keyed by offset) |
+| GET | `/api/rx-spots` | none | 200 most recent station spots, newest first |
 | GET | `/api/rx-packets` | none | Paginated RX packets with filter |
 | GET | `/api/chat-messages` | none | RX packets + TX frames merged, paginated |
 | POST | `/api/tx-message` | operator+ | Send message to JS8Call |
@@ -236,6 +240,9 @@ Observed directly: on a fresh connect, JS8Call reliably answers `INBOX.GET_MESSA
 
 ### RX.CALL_ACTIVITY / RX.BAND_ACTIVITY have dict-shaped params, not the usual fixed shape
 Every other JS8Call event's `params` is a flat object with a fixed set of keys (DIAL, FREQ, SNR, etc.), matching `Js8callEventParams`. These two are different: `params` is a dict keyed by callsign (call activity) or offset (band activity), e.g. `{"K4EXA":{"GRID":"EM63","SNR":-18,"UTC":...}}`. `Js8callEvent.UnmarshalJSON` special-cases these two event types, decoding into `event.CallActivity`/`event.BandActivity` (both `json:"-"`, so they don't leak into normal marshal output) instead of `event.Params`, which stays zero-valued for these two types. If you add another event type with this same dict-shaped quirk, extend the switch in `UnmarshalJSON`, not `Js8callEventParams`. The `CallActivityEntry`/`BandActivityEntry` field tags are intentionally all-caps (`GRID`, `SNR`, `UTC`, ...) to match JS8Call's wire format directly, since the same struct is reused to serialize `/api/call-activity`/`/api/band-activity` and the websocket broadcast — the frontend reads `row.GRID`/`row.SNR` etc., not the PascalCase convention used by RX_PACKET/RIG_STATUS's hand-written model types.
+
+### RX.SPOT has no timestamp field
+Unlike `RX.ACTIVITY`/`RX.DIRECTED` (which carry `UTC`), `RX.SPOT`'s documented payload is `{"CALL":"...","DIAL":...,"FREQ":...,"GRID":"...","OFFSET":...,"SNR":...,"_ID":-1}` — no time reference at all (`_ID` is a fixed `-1` sentinel here, not usable as a timestamp). `CreateRxSpotObj` (`model/rxSpot.go`) stamps `time.Now().UTC()` at receive time instead of reading `event.Params.UTC` (which is always 0 for this event type — this was a real bug before it was fixed: every stored spot had timestamp `1970-01-01`).
 
 ### JS8Call speed codes
 The integer codes for `MODE.SET_SPEED` and `model.SpeedName()` are:
@@ -336,3 +343,5 @@ These features were added after the initial codebase and are not in the original
 | Station Details settings, hide-heartbeat filter | `stationApi.go`, `webappServer.go`, `station-details.mjs`, `chat-window.mjs`, `chat.mjs`, `style.css` |
 | Pure-Go SQLite driver (drop CGo dependency) | `db.go`, `go.mod`, `go.sum` (switched `mattn/go-sqlite3` → `modernc.org/sqlite`) |
 | Calls / Band activity tabs | `model/js8callEvent.go` (custom `UnmarshalJSON`), `model/callActivity.go`, `model/bandActivity.go`, `callActivity.go`, `bandActivity.go`, `dispatcher.go`, `js8call.go`, `api.go`, `webappServer.go`, `call-activity.mjs`, `band-activity.mjs`, `snr-color.mjs`, `chat-window.mjs`, `style.css` |
+| Spots tab (map + list), fix RX.SPOT timestamp bug | `model/rxSpot.go`, `api.go`, `webappServer.go`, `spots.mjs`, `grid-to-latlon.mjs`, `chat-window.mjs`, `index.html` (Leaflet CDN), `style.css` |
+| systemd unit file | `js8web.service` |

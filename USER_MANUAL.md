@@ -13,6 +13,7 @@ js8web is a web-based monitor and control interface for [JS8Call](http://js8call
 - Rig Control tab for tuning frequency (with offset slider) and TX speed
 - Calls tab showing currently-heard callsigns (grid, SNR, last heard)
 - Band tab showing current band activity by offset (SNR, decoded text, last heard)
+- Spots tab with a map and list of received station spots
 - Station Details settings to edit grid/info/status from the Settings tab
 - Hide-heartbeat filter to hide incoming HEARTBEAT messages
 - TX messages show actual transmitted text in the chat
@@ -112,6 +113,26 @@ All flags can also be set via environment variables (`JS8WEB_PORT`, `JS8WEB_JS8C
 nohup ./js8web -port 8080 > js8web.log 2>&1 &
 ```
 
+### Running as a systemd Service (Linux)
+
+A unit file is provided at `js8web.service`. It expects the binary and database to live in `/opt/js8web` and run as a dedicated `js8web` user — edit `User`, `Group`, `WorkingDirectory`, and `ExecStart` if you want different paths/user.
+
+```bash
+sudo useradd --system --home /opt/js8web --shell /usr/sbin/nologin js8web
+sudo mkdir -p /opt/js8web
+sudo cp js8web /opt/js8web/
+sudo chown -R js8web:js8web /opt/js8web
+
+sudo cp js8web.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now js8web
+
+# Logs
+journalctl -u js8web -f
+```
+
+To change flags, uncomment and edit the `Environment=` lines in the unit file (or add an `EnvironmentFile=`), then `sudo systemctl daemon-reload && sudo systemctl restart js8web`.
+
 ---
 
 ## Login and Roles
@@ -163,6 +184,7 @@ Tabs appear below the status bar. Fixed tabs:
 - **Rig** — rig frequency and speed control
 - **Calls** — currently-heard callsigns
 - **Band** — current band activity by offset
+- **Spots** — map and list of received station spots
 - **⚙** — Settings (includes Station Details)
 - **🛡 Admin** — user management (admin only)
 
@@ -309,6 +331,17 @@ The table reflects JS8Call's own call activity window and updates over the webso
 A live table of current band activity by offset: SNR, the last decoded text at that offset, and last-heard time. Click an offset to open a frequency-filtered chat tab.
 
 Reflects JS8Call's own band activity window; updates the same way as the Calls tab.
+
+---
+
+## Spots Tab
+
+A map and list of received station spots (JS8Call's `RX.SPOT` reports).
+
+- **Map** — one marker per callsign, plotted from its grid square, color-coded by SNR (blue=weak → red=strong). Only the most recent spot per callsign is shown, so repeat spots of the same station don't stack markers. Click a marker for a tooltip with callsign/grid/SNR, or click it to open a filtered chat tab for that callsign.
+- **List** — the 200 most recent spots, newest first: callsign, grid, SNR, frequency (click to open a frequency-filtered tab), and time.
+
+Spots without a valid/parseable grid square aren't shown on the map (no location to plot) but still appear in the list.
 
 ---
 

@@ -20,6 +20,7 @@ The goal is to provide a remote, browser-accessible dashboard for monitoring and
 | Frontend framework | Vue.js 3 (ESM via CDN, no build step) |
 | CSS framework | Bootstrap 5.2 + Bootstrap Icons |
 | HTTP client (frontend) | axios (CDN import map) |
+| Mapping (Spots tab) | Leaflet 1.9 (CDN import map) + OpenStreetMap tiles |
 | Static file serving | Go `embed` (webapp directory is embedded into the binary) |
 
 ---
@@ -104,7 +105,7 @@ The goal is to provide a remote, browser-accessible dashboard for monitoring and
 | `websocketEvent.go` | Defines `WebsocketEvent` interface (anything with `WsType()`). |
 | `websocketMessage.go` | Defines `WebsocketMessage` struct sent over WebSocket to browsers. |
 | `rxPacket.go` | `RxPacketObj` — model for received packets. Insert, Scan, query logic. Supports filtered listing with pagination by timestamp (before/after). |
-| `rxSpot.go` | `RxSpotObj` — model for RX spot reports. Insert logic. Stub for listing by days. |
+| `rxSpot.go` | `RxSpotObj` — model for RX spot reports. `RX.SPOT` carries no timestamp field at all (unlike `RX.ACTIVITY`), so `CreateRxSpotObj` stamps it with receive time instead. `FetchRecentRxSpots` returns the 200 most recent, newest first. |
 | `txFrame.go` | `TxFrameObj` — model for transmitted frames, including `Text` (the actual transmitted message text, correlated via the pending-TX-text queue). Applies rig status before saving. Supports filtered listing with pagination by timestamp. |
 | `rigStatus.go` | `RigStatusWsEvent` — in-memory rig status (dial freq, offset, speed, selected callsign). Not persisted. |
 | `rigPtt.go` | `RigPttWsEvent` — PTT on/off event for WebSocket broadcast. |
@@ -157,6 +158,8 @@ All timestamp-bearing tables have indexes on `TIMESTAMP`.
 | `call-activity.mjs` | Calls tab: table of currently-heard callsigns (grid, SNR, last heard) from JS8Call's call activity window; click a callsign to open a filtered chat tab. |
 | `band-activity.mjs` | Band tab: table of current band activity by offset (SNR, decoded text, last heard); click an offset to open a frequency-filtered chat tab. |
 | `station-details.mjs` | Settings > Station Details: edit grid/info/status, saved directly to JS8Call. |
+| `grid-to-latlon.mjs` | Converts a Maidenhead grid locator (4 or 6 characters) to the approximate lat/lon of its center, for map plotting. Pure function, no dependencies. |
+| `spots.mjs` | Spots tab: Leaflet map (one marker per callsign, most recent spot, color-coded by SNR) plus a scrollable list of the 200 most recent spots. Click a callsign/frequency to open a filtered chat tab. |
 | `admin-users.mjs` | Admin panel for user management. List all users, create new users, change roles, reset passwords, delete users. Only accessible to admin role. |
 | `style.css` | Chat-style layout. Flex-based full-height UI. Message bubbles, gauge styling, speed-color classes, activity tables, mobile-responsive media queries. |
 
@@ -193,6 +196,7 @@ All timestamp-bearing tables have indexes on `TIMESTAMP`.
 | `GET /api/rig-status` | GET | Returns current rig status (dial, freq, offset, channel, speed, selected) from in-memory cache. |
 | `GET /api/call-activity` | GET | Returns the current call activity snapshot (map keyed by callsign) from in-memory cache. |
 | `GET /api/band-activity` | GET | Returns the current band activity snapshot (map keyed by offset) from in-memory cache. |
+| `GET /api/rx-spots` | GET | Returns the 200 most recent station spots, newest first. |
 | `GET /api/rx-packets` | GET | Returns up to 100 RX packets. Params: `startTime` (RFC3339), `direction` (`before`/`after`), optional `filter` (JSON with `Callsign` and/or `Freq.From`/`Freq.To`). |
 | `GET /api/chat-messages` | GET | Returns up to 100 combined RX packets and TX frames, sorted by timestamp. Same params as `/api/rx-packets`. |
 | `POST /api/tx-message` | POST | Sends a text message to JS8Call. Requires operator or admin role. Body: `{"text": "..."}`. |
@@ -296,18 +300,18 @@ The webapp is embedded in the binary — no separate deployment needed.
 - **Calls tab** / **Band tab** — live tables of JS8Call's call/band activity windows, updating over the websocket
 - **Station Details settings** — edit grid/info/status directly from js8web (callsign is read-only in JS8Call's API, so it's not editable here)
 - **Hide-heartbeat filter** — hides incoming `HEARTBEAT` messages from chat, with infinite scroll adjusted so a fully-filtered page doesn't stall pagination
+- **Spots tab** — map (one marker per callsign, color-coded by SNR, plotted from the grid square via Maidenhead-to-lat/lon conversion) and list of the 200 most recent station spots
+- **systemd service file** — `js8web.service` provided for running as a Linux service; see USER_MANUAL.md for setup
 
 ### 🚧 Partially Implemented / Stubbed
 
-- **RX Spot listing** — `RxSpotListDays()` function body is empty (stub). Spots are stored but not displayed in the UI.
+Nothing currently stubbed.
 
 ### ❌ Not Yet Implemented
 
-- RX spot display / spot map
-- HTTPS / TLS support
+- HTTPS / TLS support (put js8web behind a reverse proxy like Caddy/nginx if you need this)
 - Unit / integration tests
 - CI/CD pipeline
-- systemd service file
 
 ---
 

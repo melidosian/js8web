@@ -7,6 +7,7 @@ import Rig from './rig.mjs'
 import StationDetails from './station-details.mjs'
 import CallActivity from './call-activity.mjs'
 import BandActivity from './band-activity.mjs'
+import Spots from './spots.mjs'
 
 function uidGenerator() {
     var S4 = function () {
@@ -25,6 +26,7 @@ export default {
         StationDetails,
         CallActivity,
         BandActivity,
+        Spots,
     },
     emits: ['toast'],
     data() {
@@ -101,6 +103,9 @@ export default {
         <li class="nav-item" :class="{active: activeTab == 'band-activity'}">
             <a class="nav-link" :class="{active: activeTab == 'band-activity'}" @click="activateTab('band-activity')" href="#"><i class="bi bi-bar-chart-steps"></i> Band</a>
         </li>
+        <li class="nav-item" :class="{active: activeTab == 'spots'}">
+            <a class="nav-link" :class="{active: activeTab == 'spots'}" @click="activateTab('spots')" href="#"><i class="bi bi-geo-alt"></i> Spots</a>
+        </li>
         <li class="nav-item" :class="{active: activeTab == 'settings'}">
             <a class="nav-link" :class="{active: activeTab == 'settings'}" @click="activateTab('settings')" href="#"><i class="bi bi-gear"></i></a>
         </li>
@@ -133,6 +138,7 @@ export default {
     <Rig v-if="activeTab == 'rig'" v-show="activeTab == 'rig'" @toast="e => $emit('toast', e)" />
     <CallActivity v-if="activeTab == 'call-activity'" v-show="activeTab == 'call-activity'" @callsignSelected="this.callsignSelected" />
     <BandActivity v-if="activeTab == 'band-activity'" v-show="activeTab == 'band-activity'" @frequencySelected="this.frequencySelected" />
+    <Spots v-if="activeTab == 'spots'" v-show="activeTab == 'spots'" @callsignSelected="this.callsignSelected" @frequencySelected="this.frequencySelected" />
     <AdminUsers v-if="$root.authUser?.role === 'admin'" v-show="activeTab == 'admin'" @toast="e => $emit('toast', e)" />
     `
 }
