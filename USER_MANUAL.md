@@ -22,7 +22,7 @@ js8web is a web-based monitor and control interface for [JS8Call](http://js8call
 ## Requirements
 
 - **JS8Call** — installed, configured, and running with the TCP API enabled
-- **Go 1.18+** and **GCC** — needed only for building from source
+- **Go 1.25+** — needed only for building from source
 - A modern web browser (Chrome, Firefox, Edge, Safari)
 
 ---
@@ -50,10 +50,10 @@ docker build -t js8web .
 # Run
 docker run -d \
   --name js8web \
-  -p 8081:8081 \
+  -p 8080:8080 \
   -v js8web-data:/data \
   js8web \
-  -port 8081 \
+  -port 8080 \
   -js8call-addr <JS8CALL_HOST>:2442
 ```
 
@@ -78,7 +78,7 @@ Before starting js8web, enable JS8Call's TCP API:
 ## Running js8web
 
 ```bash
-./js8web -port 8081
+./js8web -port 8080
 ```
 
 On the first run, js8web will:
@@ -88,7 +88,7 @@ On the first run, js8web will:
 4. Connect to JS8Call at `localhost:2442`
 5. Start the web server on the specified port (binds to all interfaces, `0.0.0.0`)
 
-Open your browser to `http://localhost:8081` (or `http://<your-ip>:8081` from another device).
+Open your browser to `http://localhost:8080` (or `http://<your-ip>:8080` from another device).
 
 ### Command-Line Options
 
@@ -105,7 +105,7 @@ All flags can also be set via environment variables (`JS8WEB_PORT`, `JS8WEB_JS8C
 ### Running in the Background
 
 ```bash
-nohup ./js8web -port 8081 > js8web.log 2>&1 &
+nohup ./js8web -port 8080 > js8web.log 2>&1 &
 ```
 
 ---
@@ -352,7 +352,7 @@ All messages, spots, TX frames, inbox messages, and station info are stored in `
 - Confirm js8web is connected (check log: "Connected to JS8call")
 - Ensure JS8Call is receiving signals
 - Refresh the browser page
-- Try `curl http://localhost:8081/api/station-info` — it should return JSON
+- Try `curl http://localhost:8080/api/station-info` — it should return JSON
 
 ### Browser shows blank page or JS errors
 - Open browser developer console (F12) for details

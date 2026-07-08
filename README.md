@@ -7,14 +7,14 @@ js8web connects to a running JS8Call instance via its TCP API, captures received
 ## Quick Start
 
 ```bash
-# Build (requires Go 1.18+ and GCC)
+# Build (requires Go 1.25+)
 go build -o js8web .
 
 # Run (JS8Call must be running with TCP API enabled on port 2442)
-./js8web -port 8081
+./js8web
 
 # Open in browser
-# http://localhost:8081
+# http://localhost:8080
 # Default login: admin / admin
 ```
 
