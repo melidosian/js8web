@@ -87,12 +87,16 @@ Default login: **admin / admin**
 | `txActivity.go` | Notifier for `TX.FRAME`; attaches pending TX text via `popPendingTxText()`. |
 | `inboxActivity.go` | Notifiers for `INBOX.MESSAGES` (bulk) and `INBOX.MESSAGE` (single). |
 | `pendingTx.go` | Mutex-protected FIFO queue (`setPendingTxText`/`advancePendingTxText`/`popPendingTxText`) for correlating outgoing message text with the arriving TX.FRAME event, in send order. |
+| `callActivity.go` | Notifier for `RX.CALL_ACTIVITY`; in-memory `callActivityCache` (whole-snapshot replace, not diffed). |
+| `bandActivity.go` | Notifier for `RX.BAND_ACTIVITY`; in-memory `bandActivityCache` (whole-snapshot replace, not diffed). |
 
 ### Model package (`model/`)
 
 | File | Responsibility |
 |------|---------------|
-| `js8callEvent.go` | `Js8callEvent` struct, all event type constants, `InboxMessageParam`, `CalcChannelFromOffset`, `SpeedName`. |
+| `js8callEvent.go` | `Js8callEvent` struct with custom `UnmarshalJSON` (routes `params` into `Params`, or into `CallActivity`/`BandActivity` for the two dict-shaped event types), all event type constants, `InboxMessageParam`, `CalcChannelFromOffset`, `SpeedName`. |
+| `callActivity.go` | `CallActivityWsEvent` (`map[string]CallActivityEntry`, keyed by callsign), `CallActivityEntry` (Grid/Snr/UTC). |
+| `bandActivity.go` | `BandActivityWsEvent` (`map[string]BandActivityEntry`, keyed by offset), `BandActivityEntry` (Dial/Freq/Offset/Snr/Text/UTC). |
 | `rxPacket.go` | `RxPacketObj`, `RxPacketFilter`, SQL, fetch/scan logic with callsign + frequency filtering. |
 | `txFrame.go` | `TxFrameObj` with `Text` field (for displaying transmitted message text). |
 | `chatMessage.go` | `ChatMessage` unified wrapper; `FetchChatMessages` merges RX packets + TX frames sorted by timestamp. |
@@ -122,7 +126,7 @@ Default login: **admin / admin**
 | `login-page.mjs` | Login form. |
 | `status-bar.mjs` | Top bar: connection icon, callsign, grid, freq, offset, speed, selected, info, user+logout. |
 | `toast-container.mjs` | Success/error/info/warning toast system. |
-| `chat-window.mjs` | Tab manager. Owns `quickReplies` state (localStorage). Renders Chat, Inbox, Rig, Settings, Admin tabs. |
+| `chat-window.mjs` | Tab manager. Owns `quickReplies` state (localStorage). Renders Chat, Inbox, Rig, Calls, Band, Settings, Admin tabs. |
 | `chat.mjs` | Core message list with infinite scroll, real-time WS updates, compose input, quick-reply bar, `@callsign` prepend for filtered tabs. |
 | `chat-message.mjs` | Router: renders `ChatRxPacket`, `ChatRxMessage`, or `ChatTxFrame` based on `message.Type`. |
 | `chat-rx-message.mjs` | Directed message bubble: callsign + search icon, gauges, message text. |
@@ -134,9 +138,12 @@ Default login: **admin / admin**
 | `quick-reply-settings.mjs` | Settings section: add/edit (label+color+message)/reorder/delete; live color preview. |
 | `inbox.mjs` | Inbox tab: compose form (callsign + message), scrollable message list, real-time WS updates. |
 | `inbox-message.mjs` | Single inbox message: callsign, timestamp, message body. |
-| `rig.mjs` | Rig control tab: live freq display, preset buttons (80/40/30/20/15m), manual freq+offset input, speed buttons (Slow/Normal/Fast/Turbo). |
+| `rig.mjs` | Rig control tab: live freq display, preset buttons (80/40/30/20/15m), offset slider (200-3000Hz), speed buttons (Slow/Normal/Fast/Turbo). |
 | `admin-users.mjs` | Admin panel: list/create/edit/delete users. |
-| `style.css` | All CSS: status bar, chat layout, message bubbles, gauges, quick-reply bar, inbox, rig panel, mobile responsive. |
+| `snr-color.mjs` | Shared `snrColor(snr)` gradient helper (blue→yellow→red), used by chat gauges and the activity tabs. |
+| `call-activity.mjs` | Calls tab: table of heard callsigns (grid, SNR, last heard) from JS8Call's call activity window; click a callsign to open a filtered chat tab. |
+| `band-activity.mjs` | Band tab: table of current band activity by offset (SNR, text, last heard); click an offset to open a frequency-filtered chat tab. |
+| `style.css` | All CSS: status bar, chat layout, message bubbles, gauges, quick-reply bar, inbox, rig panel, activity tables, mobile responsive. |
 
 ---
 
@@ -146,6 +153,8 @@ Default login: **admin / admin**
 |--------|------|------|-------------|
 | GET | `/api/station-info` | none | Current station info from cache |
 | GET | `/api/rig-status` | none | Current rig status from cache |
+| GET | `/api/call-activity` | none | Current call activity snapshot from cache (keyed by callsign) |
+| GET | `/api/band-activity` | none | Current band activity snapshot from cache (keyed by offset) |
 | GET | `/api/rx-packets` | none | Paginated RX packets with filter |
 | GET | `/api/chat-messages` | none | RX packets + TX frames merged, paginated |
 | POST | `/api/tx-message` | operator+ | Send message to JS8Call |
@@ -192,6 +201,8 @@ The filter **must be JSON-stringified** before sending as a query param — axio
 | `INBOX.MESSAGES` | `inboxMessagesNotifier` | Bulk inbox; `event.Params.Messages []InboxMessageParam` |
 | `INBOX.MESSAGE` | `inboxMessageNotifier` | Single new inbox message |
 | `STATION.CALLSIGN` / `STATION.GRID` / `STATION.INFO` | `stationInfoNotifier` | Station metadata |
+| `RX.CALL_ACTIVITY` | `callActivityNotifier` | Full call activity window snapshot, `params` is a dict keyed by callsign — decoded into `event.CallActivity`, not `event.Params` |
+| `RX.BAND_ACTIVITY` | `bandActivityNotifier` | Full band activity window snapshot, `params` is a dict keyed by offset — decoded into `event.BandActivity`, not `event.Params` |
 
 ### Outgoing (js8web → JS8Call)
 
@@ -204,6 +215,8 @@ The filter **must be JSON-stringified** before sending as a query param — axio
 | `RIG.SET_FREQ` | User posts to `/api/rig/freq` |
 | `MODE.GET_SPEED` | On every TCP connect |
 | `MODE.SET_SPEED` | User posts to `/api/rig/speed` |
+| `RX.GET_CALL_ACTIVITY` | On every TCP connect |
+| `RX.GET_BAND_ACTIVITY` | On every TCP connect |
 
 ---
 
@@ -214,6 +227,9 @@ JS8Call's `TX.FRAME` event contains only tone data (TONES array), not the messag
 
 ### INBOX.GET_MESSAGES on every reconnect
 `sendConnectEvents` sends `INBOX.GET_MESSAGES` every time the TCP connection is established (including reconnects). JS8Call responds with `INBOX.MESSAGES` containing all stored messages. The `INSERT OR IGNORE` in `InboxMessageObj.Insert` with a `UNIQUE(CALLSIGN, UTC_MS, MESSAGE)` constraint prevents duplicate DB rows. The frontend deduplicates by `Id` in the WebSocket handler.
+
+### RX.CALL_ACTIVITY / RX.BAND_ACTIVITY have dict-shaped params, not the usual fixed shape
+Every other JS8Call event's `params` is a flat object with a fixed set of keys (DIAL, FREQ, SNR, etc.), matching `Js8callEventParams`. These two are different: `params` is a dict keyed by callsign (call activity) or offset (band activity), e.g. `{"K4EXA":{"GRID":"EM63","SNR":-18,"UTC":...}}`. `Js8callEvent.UnmarshalJSON` special-cases these two event types, decoding into `event.CallActivity`/`event.BandActivity` (both `json:"-"`, so they don't leak into normal marshal output) instead of `event.Params`, which stays zero-valued for these two types. If you add another event type with this same dict-shaped quirk, extend the switch in `UnmarshalJSON`, not `Js8callEventParams`. The `CallActivityEntry`/`BandActivityEntry` field tags are intentionally all-caps (`GRID`, `SNR`, `UTC`, ...) to match JS8Call's wire format directly, since the same struct is reused to serialize `/api/call-activity`/`/api/band-activity` and the websocket broadcast — the frontend reads `row.GRID`/`row.SNR` etc., not the PascalCase convention used by RX_PACKET/RIG_STATUS's hand-written model types.
 
 ### JS8Call speed codes
 The integer codes for `MODE.SET_SPEED` and `model.SpeedName()` are:
@@ -313,3 +329,4 @@ These features were added after the initial codebase and are not in the original
 | Rig Control tab | `rigStatus.go`, `inboxApi.go`, `webappServer.go`, `rig.mjs` |
 | Station Details settings, hide-heartbeat filter | `stationApi.go`, `webappServer.go`, `station-details.mjs`, `chat-window.mjs`, `chat.mjs`, `style.css` |
 | Pure-Go SQLite driver (drop CGo dependency) | `db.go`, `go.mod`, `go.sum` (switched `mattn/go-sqlite3` → `modernc.org/sqlite`) |
+| Calls / Band activity tabs | `model/js8callEvent.go` (custom `UnmarshalJSON`), `model/callActivity.go`, `model/bandActivity.go`, `callActivity.go`, `bandActivity.go`, `dispatcher.go`, `js8call.go`, `api.go`, `webappServer.go`, `call-activity.mjs`, `band-activity.mjs`, `snr-color.mjs`, `chat-window.mjs`, `style.css` |

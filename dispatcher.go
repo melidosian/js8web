@@ -56,6 +56,10 @@ func dispatchStateChangeEvents(events <-chan model.Js8callEvent) (<-chan model.W
 				f = inboxMessagesNotifier
 			case model.EVENT_TYPE_INBOX_MESSAGE:
 				f = inboxMessageNotifier
+			case model.EVENT_TYPE_RX_CALL_ACTIVITY:
+				f = callActivityNotifier
+			case model.EVENT_TYPE_RX_BAND_ACTIVITY:
+				f = bandActivityNotifier
 			default:
 				f = defaultNotifier
 			}

@@ -40,6 +40,12 @@ func startWebappServer(db *sql.DB, wsEventsSessionContainer *websocketSessionCon
 	mux.HandleFunc("/api/rig-status", methodHandler(methodRouter{
 		get: apiRigStatusGet,
 	}, db))
+	mux.HandleFunc("/api/call-activity", methodHandler(methodRouter{
+		get: apiCallActivityGet,
+	}, db))
+	mux.HandleFunc("/api/band-activity", methodHandler(methodRouter{
+		get: apiBandActivityGet,
+	}, db))
 	mux.HandleFunc("/api/tx-message", roleRequired(
 		[]string{model.ROLE_ADMIN, model.ROLE_OPERATOR},
 		methodHandler(methodRouter{

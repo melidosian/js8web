@@ -52,6 +52,36 @@ func apiRigStatusGet(w http.ResponseWriter, req *http.Request, db *sql.DB) {
 	w.Write(rigStatusJson)
 }
 
+func apiCallActivityGet(w http.ResponseWriter, req *http.Request, db *sql.DB) {
+	callActivityJson, err := json.Marshal(callActivityCache)
+	if err != nil {
+		logger.Sugar().Errorw(
+			"Cannot marshal callActivity",
+			"callActivity", callActivityCache,
+			"error", err,
+		)
+		http.Error(w, "cannot marshal json", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(callActivityJson)
+}
+
+func apiBandActivityGet(w http.ResponseWriter, req *http.Request, db *sql.DB) {
+	bandActivityJson, err := json.Marshal(bandActivityCache)
+	if err != nil {
+		logger.Sugar().Errorw(
+			"Cannot marshal bandActivity",
+			"bandActivity", bandActivityCache,
+			"error", err,
+		)
+		http.Error(w, "cannot marshal json", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(bandActivityJson)
+}
+
 func apiRxPacketsGet(w http.ResponseWriter, req *http.Request, db *sql.DB) {
 	q := req.URL.Query()
 	if !q.Has("startTime") {

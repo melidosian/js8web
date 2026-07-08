@@ -5,6 +5,8 @@ import { loadQuickReplies, saveQuickReplies } from './quick-replies.mjs'
 import Inbox from './inbox.mjs'
 import Rig from './rig.mjs'
 import StationDetails from './station-details.mjs'
+import CallActivity from './call-activity.mjs'
+import BandActivity from './band-activity.mjs'
 
 function uidGenerator() {
     var S4 = function () {
@@ -21,6 +23,8 @@ export default {
         Inbox,
         Rig,
         StationDetails,
+        CallActivity,
+        BandActivity,
     },
     emits: ['toast'],
     data() {
@@ -91,6 +95,12 @@ export default {
         <li class="nav-item" :class="{active: activeTab == 'rig'}">
             <a class="nav-link" :class="{active: activeTab == 'rig'}" @click="activateTab('rig')" href="#"><i class="bi bi-broadcast"></i> Rig</a>
         </li>
+        <li class="nav-item" :class="{active: activeTab == 'call-activity'}">
+            <a class="nav-link" :class="{active: activeTab == 'call-activity'}" @click="activateTab('call-activity')" href="#"><i class="bi bi-people"></i> Calls</a>
+        </li>
+        <li class="nav-item" :class="{active: activeTab == 'band-activity'}">
+            <a class="nav-link" :class="{active: activeTab == 'band-activity'}" @click="activateTab('band-activity')" href="#"><i class="bi bi-bar-chart-steps"></i> Band</a>
+        </li>
         <li class="nav-item" :class="{active: activeTab == 'settings'}">
             <a class="nav-link" :class="{active: activeTab == 'settings'}" @click="activateTab('settings')" href="#"><i class="bi bi-gear"></i></a>
         </li>
@@ -121,6 +131,8 @@ export default {
     </div>
     <Inbox v-if="activeTab == 'inbox'" v-show="activeTab == 'inbox'" @toast="e => $emit('toast', e)" />
     <Rig v-if="activeTab == 'rig'" v-show="activeTab == 'rig'" @toast="e => $emit('toast', e)" />
+    <CallActivity v-if="activeTab == 'call-activity'" v-show="activeTab == 'call-activity'" @callsignSelected="this.callsignSelected" />
+    <BandActivity v-if="activeTab == 'band-activity'" v-show="activeTab == 'band-activity'" @frequencySelected="this.frequencySelected" />
     <AdminUsers v-if="$root.authUser?.role === 'admin'" v-show="activeTab == 'admin'" @toast="e => $emit('toast', e)" />
     `
 }

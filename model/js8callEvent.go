@@ -1,5 +1,7 @@
 package model
 
+import "encoding/json"
+
 var (
 	MODE_JS8                    = "js8"
 	EVENT_TYPE_RX_ACTIVITY      = "RX.ACTIVITY"
@@ -37,18 +39,26 @@ var (
 	EVENT_TYPE_MODE_GET_SPEED = "MODE.GET_SPEED"
 	EVENT_TYPE_MODE_SET_SPEED = "MODE.SET_SPEED"
 
+	// activity window events
+	EVENT_TYPE_RX_GET_CALL_ACTIVITY = "RX.GET_CALL_ACTIVITY"
+	EVENT_TYPE_RX_CALL_ACTIVITY     = "RX.CALL_ACTIVITY"
+	EVENT_TYPE_RX_GET_BAND_ACTIVITY = "RX.GET_BAND_ACTIVITY"
+	EVENT_TYPE_RX_BAND_ACTIVITY     = "RX.BAND_ACTIVITY"
+
 	// outgoing event types (sent to JS8Call)
 	EVENT_TYPE_TX_SEND_MESSAGE = "TX.SEND_MESSAGE"
 
 	// event types as seen in Websocket communication
-	WS_EVENT_TYPE_RIG_PTT      = "RIG.PTT"
-	WS_EVENT_TYPE_RIG_STATUS   = "RIG.STATUS"
-	WS_EVENT_TYPE_STATION_INFO = "STATION.INFO"
-	WS_OBJ_TYPE_RX_PACKET      = "RX.PACKET"
-	WS_OBJ_TYPE_RX_SPOT        = "RX.SPOT"
-	WS_OBJ_TYPE_TX_FRAME       = "TX.FRAME"
-	WS_OBJ_TYPE_INBOX_MESSAGE  = "INBOX.MESSAGE"
-	WS_OBJ_TYPE_OTHER          = "OTHER"
+	WS_EVENT_TYPE_RIG_PTT       = "RIG.PTT"
+	WS_EVENT_TYPE_RIG_STATUS    = "RIG.STATUS"
+	WS_EVENT_TYPE_STATION_INFO  = "STATION.INFO"
+	WS_EVENT_TYPE_CALL_ACTIVITY = "RX.CALL_ACTIVITY"
+	WS_EVENT_TYPE_BAND_ACTIVITY = "RX.BAND_ACTIVITY"
+	WS_OBJ_TYPE_RX_PACKET       = "RX.PACKET"
+	WS_OBJ_TYPE_RX_SPOT         = "RX.SPOT"
+	WS_OBJ_TYPE_TX_FRAME        = "TX.FRAME"
+	WS_OBJ_TYPE_INBOX_MESSAGE   = "INBOX.MESSAGE"
+	WS_OBJ_TYPE_OTHER           = "OTHER"
 )
 
 type Js8callEvent struct {
@@ -56,8 +66,59 @@ type Js8callEvent struct {
 	Value  string             `json:"value"`
 	Params Js8callEventParams `json:"params"`
 
+	// CallActivity/BandActivity hold the params payload for RX.CALL_ACTIVITY/RX.BAND_ACTIVITY
+	// events, whose "params" is a dict keyed by callsign/offset rather than the fixed shape
+	// every other event uses. See UnmarshalJSON.
+	CallActivity map[string]CallActivityEntry `json:"-"`
+	BandActivity map[string]BandActivityEntry `json:"-"`
+
 	DataType string
 	Data     interface{}
+}
+
+// UnmarshalJSON decodes params into the fixed Js8callEventParams shape for most event
+// types, but into CallActivity/BandActivity for the two whose params is instead a dict
+// keyed by callsign/offset.
+func (e *Js8callEvent) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Type   string          `json:"type"`
+		Value  string          `json:"value"`
+		Params json.RawMessage `json:"params"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	e.Type = raw.Type
+	e.Value = raw.Value
+
+	if len(raw.Params) == 0 {
+		return nil
+	}
+	switch e.Type {
+	case EVENT_TYPE_RX_CALL_ACTIVITY:
+		return json.Unmarshal(raw.Params, &e.CallActivity)
+	case EVENT_TYPE_RX_BAND_ACTIVITY:
+		return json.Unmarshal(raw.Params, &e.BandActivity)
+	default:
+		return json.Unmarshal(raw.Params, &e.Params)
+	}
+}
+
+// CallActivityEntry is one callsign's entry in RX.CALL_ACTIVITY's params dict.
+type CallActivityEntry struct {
+	Grid string `json:"GRID"`
+	Snr  int    `json:"SNR"`
+	UTC  int64  `json:"UTC"`
+}
+
+// BandActivityEntry is one offset's entry in RX.BAND_ACTIVITY's params dict.
+type BandActivityEntry struct {
+	Dial   uint32 `json:"DIAL"`
+	Freq   uint32 `json:"FREQ"`
+	Offset uint16 `json:"OFFSET"`
+	Snr    int    `json:"SNR"`
+	Text   string `json:"TEXT"`
+	UTC    int64  `json:"UTC"`
 }
 
 // InboxMessageParam is an element in the MESSAGES array from INBOX.MESSAGES events.
