@@ -66,35 +66,47 @@ export default {
         fetchNewestMessages() {
             return this.fetchMessages(new Date(Date.now()).toISOString())
         },
-        fetchMessagesBefore() {
-            if (this.messages.length < 1) {
+        fetchMessagesBefore(beforeTimestamp) {
+            const from = beforeTimestamp || (this.messages.length > 0 ? this.messages[0].Timestamp : null)
+            if (!from) {
+                this.loadingBefore = false
                 return
             }
-            const from = this.messages[0].Timestamp
             this.fetchMessages(from, 'before').then(result => {
                 const existingIds = this.messages.map(e => e.Id)
                 const filteredResult = result.filter(e => !existingIds.includes(e.Id) && this.filterMessage(e))
-                this.messages = filteredResult.concat(this.messages)
-                this.loadingBefore = false
+                this.messages = filteredResult.concat(this.messages.slice(0, 2 * EXPECTED_MESSAGES_COUNT))
                 this.atBottom = false
                 if (result.length < EXPECTED_MESSAGES_COUNT) {
                     this.atTop = true
+                    this.loadingBefore = false
+                } else if (filteredResult.length === 0) {
+                    // Whole page got filtered out (e.g. all heartbeats) — keep paging back
+                    // automatically instead of stalling infinite scroll on a thin/empty page.
+                    this.fetchMessagesBefore(result[0].Timestamp)
+                } else {
+                    this.loadingBefore = false
                 }
             })
         },
-        fetchMessagesAfter() {
-            if (this.messages.length < 1) {
+        fetchMessagesAfter(afterTimestamp) {
+            const from = afterTimestamp || (this.messages.length > 0 ? this.messages[this.messages.length - 1].Timestamp : null)
+            if (!from) {
+                this.loadingAfter = false
                 return
             }
-            const from = this.messages[this.messages.length - 1].Timestamp
             this.fetchMessages(from, 'after').then(result => {
                 const existingIds = this.messages.map(e => e.Id)
                 const filteredResult = result.filter(e => !existingIds.includes(e.Id) && this.filterMessage(e))
                 this.messages = this.messages.slice(-2 * EXPECTED_MESSAGES_COUNT).concat(filteredResult)
-                this.loadingAfter = false
                 this.atTop = false
                 if (result.length < EXPECTED_MESSAGES_COUNT) {
                     this.atBottom = true
+                    this.loadingAfter = false
+                } else if (filteredResult.length === 0) {
+                    this.fetchMessagesAfter(result[result.length - 1].Timestamp)
+                } else {
+                    this.loadingAfter = false
                 }
             })
         },
@@ -141,6 +153,12 @@ export default {
         },
         jumpToBottom() {
             this.newMessagesWaiting = false
+            if (this.atBottom) {
+                // Already holding the live edge (e.g. new message arrived while scrolled up
+                // within loaded history) — it's already in `messages`, just scroll to it.
+                this.$nextTick(_ => this.scrollToBottom())
+                return
+            }
             this.fetchNewestMessages().then(messages => {
                 this.messages = messages.filter(this.filterMessage)
                 this.atTop = false
@@ -189,7 +207,9 @@ export default {
             const input = this.$refs.txInput
             if (input) this.savedSelection = { start: input.selectionStart, end: input.selectionEnd }
         },
-        insertQuickReply(text) {
+        insertQuickReply(rawText) {
+            const grid = (this.$root.stationInfo?.Grid || '').slice(0, 4)
+            const text = rawText.replace(/\s?<MYGRID4>/g, grid ? ' ' + grid : '')
             const len = this.txText.length
             const start = this.savedSelection ? this.savedSelection.start : len
             const end   = this.savedSelection ? this.savedSelection.end   : len

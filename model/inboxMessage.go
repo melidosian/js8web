@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	SQL_INBOX_INSERT = "INSERT OR IGNORE INTO `INBOX_MESSAGE` (`TIMESTAMP`, `CALLSIGN`, `MESSAGE`, `UTC_MS`) VALUES (?, ?, ?, ?)"
-	SQL_INBOX_LIST   = "SELECT `ID`, `TIMESTAMP`, `CALLSIGN`, `MESSAGE`, `UTC_MS` FROM `INBOX_MESSAGE` ORDER BY `TIMESTAMP` DESC LIMIT 200"
+	SQL_INBOX_INSERT       = "INSERT OR IGNORE INTO `INBOX_MESSAGE` (`TIMESTAMP`, `CALLSIGN`, `MESSAGE`, `UTC_MS`) VALUES (?, ?, ?, ?)"
+	SQL_INBOX_LIST         = "SELECT `ID`, `TIMESTAMP`, `CALLSIGN`, `MESSAGE`, `UTC_MS` FROM `INBOX_MESSAGE` ORDER BY `TIMESTAMP` DESC LIMIT 200"
+	SQL_INBOX_FIND_BY_KEYS = "SELECT `ID` FROM `INBOX_MESSAGE` WHERE `CALLSIGN`=? AND `UTC_MS`=? AND `MESSAGE`=?"
 )
 
 type InboxMessageObj struct {
@@ -47,15 +48,20 @@ func (obj *InboxMessageObj) Insert(db *sql.DB) error {
 		return fmt.Errorf("error executing inbox insert: %w", err)
 	}
 
-	id, _ := res.LastInsertId()
-	if id == 0 {
-		// INSERT OR IGNORE fired — fetch existing ID for broadcast
-		row := db.QueryRow(
-			"SELECT `ID` FROM `INBOX_MESSAGE` WHERE `CALLSIGN`=? AND `UTC_MS`=? AND `MESSAGE`=?",
-			obj.Callsign, obj.UtcMs, obj.Message,
-		)
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error checking inbox insert result: %w", err)
+	}
+	if affected == 0 {
+		// INSERT OR IGNORE skipped a duplicate — fetch the existing row's ID for broadcast.
+		// (last_insert_rowid() is not reliable here: SQLite leaves it unchanged on a no-op insert.)
+		row := db.QueryRow(SQL_INBOX_FIND_BY_KEYS, obj.Callsign, obj.UtcMs, obj.Message)
 		_ = row.Scan(&obj.Id)
 	} else {
+		id, err := res.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("error reading inbox insert id: %w", err)
+		}
 		obj.Id = id
 	}
 	return nil

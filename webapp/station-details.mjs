@@ -12,16 +12,24 @@ export default {
             savingStatus: false,
         }
     },
-    created() {
-        this.inputGrid = this.stationInfo.Grid || ''
-        this.inputInfo = this.stationInfo.Info || ''
-        this.inputStatus = this.stationInfo.Status || ''
-    },
     computed: {
         stationInfo() { return this.$root.stationInfo || {} },
         canControl() {
             const role = this.$root.authUser?.role
             return role === 'admin' || role === 'operator'
+        },
+    },
+    watch: {
+        // $root.stationInfo loads asynchronously (initial fetch + websocket updates), so seed the
+        // inputs whenever it changes rather than once in created(). Only fill fields still empty,
+        // so this doesn't clobber text the user is actively editing.
+        stationInfo: {
+            immediate: true,
+            handler(info) {
+                if (!this.inputGrid) this.inputGrid = info.Grid || ''
+                if (!this.inputInfo) this.inputInfo = info.Info || ''
+                if (!this.inputStatus) this.inputStatus = info.Status || ''
+            },
         },
     },
     methods: {

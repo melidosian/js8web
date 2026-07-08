@@ -33,6 +33,9 @@ export default {
             if (e.EventType === 'object' && e.WsType === 'INBOX.MESSAGE') {
                 if (!this.messages.find(m => m.Id === e.Event.Id)) {
                     this.messages.unshift(e.Event)
+                    // Match the backend's SQL_INBOX_LIST cap so a long-running tab doesn't
+                    // accumulate inbox messages in memory/DOM without bound.
+                    if (this.messages.length > 200) this.messages.length = 200
                 }
             }
         },

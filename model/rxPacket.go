@@ -62,10 +62,10 @@ func CreateRxPacketObj(event *Js8callEvent) (*RxPacketObj, error) {
 	o.Dial = event.Params.Dial
 	o.Freq = event.Params.Freq
 	o.Offset = event.Params.Offset
-	o.Channel = calcCahnnelFromOffset(o.Offset)
+	o.Channel = CalcChannelFromOffset(o.Offset)
 	o.Snr = event.Params.Snr
 	o.Mode = MODE_JS8
-	o.Speed = speedName(event.Params.Speed)
+	o.Speed = SpeedName(event.Params.Speed)
 	o.TimeDrift = int16(1000 * event.Params.TimeDrift)
 	o.Grid = trim(event.Params.Grid)
 	o.From = trim(event.Params.From)

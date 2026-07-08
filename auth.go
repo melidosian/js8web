@@ -104,6 +104,30 @@ func roleRequired(roles []string, next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// methodRoleRequired is roleRequired for a single method within a methodRouter,
+// for routes where other methods (e.g. GET) are open to any authenticated user.
+func methodRoleRequired(roles []string, next func(http.ResponseWriter, *http.Request, *sql.DB)) func(http.ResponseWriter, *http.Request, *sql.DB) {
+	allowed := make(map[string]bool, len(roles))
+	for _, r := range roles {
+		allowed[r] = true
+	}
+	return func(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+		s, ok := getSessionFromRequest(r)
+		if !ok {
+			w.Header().Set("Content-Type", "application/json")
+			http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
+			return
+		}
+		if !allowed[s.role] {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode(authResponse{Ok: false, Error: "insufficient permissions"})
+			return
+		}
+		next(w, r, db)
+	}
+}
+
 type loginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`

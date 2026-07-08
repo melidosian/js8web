@@ -25,8 +25,8 @@ func CreateRigStatusWsEvent(event *Js8callEvent) (*RigStatusWsEvent, error) {
 	o.Dial = event.Params.Dial
 	o.Freq = event.Params.Freq
 	o.Offset = event.Params.Offset
-	o.Channel = calcCahnnelFromOffset(o.Offset)
+	o.Channel = CalcChannelFromOffset(o.Offset)
 	o.Selected = event.Params.Selected
-	o.Speed = speedName(event.Params.Speed)
+	o.Speed = SpeedName(event.Params.Speed)
 	return o, nil
 }

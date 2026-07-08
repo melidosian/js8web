@@ -72,10 +72,10 @@ func startWebappServer(db *sql.DB, wsEventsSessionContainer *websocketSessionCon
 		}
 	}))
 
-	// Inbox (GET: any authenticated user; POST: operator/admin enforced inside handler)
+	// Inbox (GET: any authenticated user; POST: operator/admin only)
 	mux.HandleFunc("/api/inbox", authRequired(methodHandler(methodRouter{
 		get:  apiInboxGet,
-		post: apiInboxPost(outgoingEvents),
+		post: methodRoleRequired([]string{model.ROLE_ADMIN, model.ROLE_OPERATOR}, apiInboxPost(outgoingEvents)),
 	}, db)))
 
 	// Rig control (operator/admin only)

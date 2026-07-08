@@ -17,8 +17,8 @@ The binary is self-contained: the entire `webapp/` directory is embedded at buil
 ```
 JS8Call (TCP :2442) ←→ js8web (Go binary)
                               ├── SQLite DB (js8web.db)
-                              ├── REST API  (:8081/api/*)
-                              ├── WebSocket (:8081/ws/events)
+                              ├── REST API  (:8080/api/*)
+                              ├── WebSocket (:8080/ws/events)
                               └── Static files (embedded webapp/)
                                         ↑
                               Browser (Vue 3 via CDN, no bundler)
@@ -36,14 +36,14 @@ JS8Call (TCP :2442) ←→ js8web (Go binary)
 ## Build & Run
 
 ```bash
-# Prerequisites: Go 1.18+, GCC (for CGo/SQLite)
+# Prerequisites: Go 1.25+ (pure-Go SQLite driver, no CGo/GCC needed)
 go build -o js8web .
 
 # Run (JS8Call must be running with TCP API on port 2442)
-./js8web -port 8081
+./js8web
 
 # Run in background (log to file)
-nohup ./js8web -port 8081 > js8web.log 2>&1 &
+nohup ./js8web > js8web.log 2>&1 &
 ```
 
 **All CLI flags:**
@@ -77,7 +77,7 @@ Default login: **admin / admin**
 | `js8call.go` | Persistent TCP connection with auto-reconnect. `sendConnectEvents()` writes `INBOX.GET_MESSAGES`, `RIG.GET_FREQ`, `MODE.GET_SPEED` directly to the bufio.Writer immediately after each successful connect (before the event loop). |
 | `api.go` | REST handlers: station info, rig status, rx-packets, chat-messages, tx-message. |
 | `inboxApi.go` | REST handlers: `GET /api/inbox`, `POST /api/inbox`, `POST /api/rig/freq`, `POST /api/rig/speed`. |
-| `auth.go` | Cookie-based session management, `authRequired`/`roleRequired` middleware, login/logout/check handlers. |
+| `auth.go` | Cookie-based session management, `authRequired`/`roleRequired`/`methodRoleRequired` middleware, login/logout/check handlers. |
 | `userApi.go` | Admin-only user CRUD. |
 | `webappServer.go` | `http.NewServeMux` setup; registers all routes; serves embedded `webapp/`. |
 | `websocket.go` | WebSocket upgrade handler, session container, broadcast. |
@@ -86,13 +86,13 @@ Default login: **admin / admin**
 | `stationInfo.go` | Notifier for `STATION.*` events; in-memory cache + DB persistence. |
 | `txActivity.go` | Notifier for `TX.FRAME`; attaches pending TX text via `popPendingTxText()`. |
 | `inboxActivity.go` | Notifiers for `INBOX.MESSAGES` (bulk) and `INBOX.MESSAGE` (single). |
-| `pendingTx.go` | Mutex-protected `setPendingTxText`/`popPendingTxText` for correlating outgoing message text with the arriving TX.FRAME event. |
+| `pendingTx.go` | Mutex-protected FIFO queue (`setPendingTxText`/`advancePendingTxText`/`popPendingTxText`) for correlating outgoing message text with the arriving TX.FRAME event, in send order. |
 
 ### Model package (`model/`)
 
 | File | Responsibility |
 |------|---------------|
-| `js8callEvent.go` | `Js8callEvent` struct, all event type constants, `InboxMessageParam`, `calcChannelFromOffset`, `speedName`. |
+| `js8callEvent.go` | `Js8callEvent` struct, all event type constants, `InboxMessageParam`, `CalcChannelFromOffset`, `SpeedName`. |
 | `rxPacket.go` | `RxPacketObj`, `RxPacketFilter`, SQL, fetch/scan logic with callsign + frequency filtering. |
 | `txFrame.go` | `TxFrameObj` with `Text` field (for displaying transmitted message text). |
 | `chatMessage.go` | `ChatMessage` unified wrapper; `FetchChatMessages` merges RX packets + TX frames sorted by timestamp. |
@@ -210,13 +210,13 @@ The filter **must be JSON-stringified** before sending as a query param — axio
 ## Known Gotchas
 
 ### TX.FRAME has no message text
-JS8Call's `TX.FRAME` event contains only tone data (TONES array), not the message text. The text is captured in `pendingTx.go` when the outgoing `TX.SEND_MESSAGE` is queued (`setPendingTxText`), then consumed by `txFrameNotifier` when the first `TX.FRAME` arrives (`popPendingTxText`). Subsequent frames for the same transmission get an empty text and display "Transmitted frame" as a fallback.
+JS8Call's `TX.FRAME` event contains only tone data (TONES array), not the message text. The text is captured in `pendingTx.go` when the outgoing `TX.SEND_MESSAGE` is queued (`setPendingTxText`, appended to a FIFO queue — sends can be queued faster than JS8Call transmits them). `rigPttNotifier` (`rigStatus.go`) calls `advancePendingTxText()` on the PTT-on edge (false→true), dequeuing the next queued text into the slot `txFrameNotifier` reads via `popPendingTxText()` on the first `TX.FRAME` of that transmission. Subsequent frames for the same transmission get an empty text and display "Transmitted frame" as a fallback. This relies on JS8Call emitting `RIG.PTT(true)` before the first `TX.FRAME` of each transmission — true for the protocol's single-threaded dispatch, but only exercised via passive review, not a live over-the-air test.
 
 ### INBOX.GET_MESSAGES on every reconnect
 `sendConnectEvents` sends `INBOX.GET_MESSAGES` every time the TCP connection is established (including reconnects). JS8Call responds with `INBOX.MESSAGES` containing all stored messages. The `INSERT OR IGNORE` in `InboxMessageObj.Insert` with a `UNIQUE(CALLSIGN, UTC_MS, MESSAGE)` constraint prevents duplicate DB rows. The frontend deduplicates by `Id` in the WebSocket handler.
 
 ### JS8Call speed codes
-The integer codes for `MODE.SET_SPEED` and `speedName()` are:
+The integer codes for `MODE.SET_SPEED` and `model.SpeedName()` are:
 
 | Code | Name |
 |------|------|
@@ -255,6 +255,7 @@ The frontend uses Vue 3 and axios loaded directly from CDN via an import map in 
 - API handlers that need `outgoingEvents` are constructor functions returning a handler: `func apiXxx(outgoingEvents chan<-) func(w, r, db)`
 - `authRequired` wraps `http.HandlerFunc`; `roleRequired(roles, next)` does the same with role check
 - `methodHandler(methodRouter{get: ..., post: ...}, db)` returns an `http.HandlerFunc` that dispatches by HTTP method
+- For a route where only some methods need a stricter role (e.g. `/api/inbox`: GET open to any authenticated user, POST operator/admin-only), wrap the whole route in `authRequired` and wrap just that method's `methodRouter` field in `methodRoleRequired(roles, handler)` — don't hand-roll a role check inside the handler
 
 ### Vue 3 / Frontend
 - All components are plain `.mjs` ES modules with `export default { ... }`
@@ -278,11 +279,11 @@ The frontend uses Vue 3 and axios loaded directly from CDN via an import map in 
 
 There are no automated tests. Manual testing checklist:
 
-1. `go build -o js8web .` — must compile without errors (linker warning about LC_DYSYMTAB on Apple Silicon is harmless)
-2. `./js8web -port 8081` starts and logs "js8web ready"
-3. `curl http://localhost:8081/` returns HTTP 200
-4. `curl http://localhost:8081/api/auth/check` returns `{"ok":false}`
-5. Login at `http://localhost:8081` with admin/admin works
+1. `go build -o js8web .` — must compile without errors
+2. `./js8web` starts and logs "js8web ready"
+3. `curl http://localhost:8080/` returns HTTP 200
+4. `curl http://localhost:8080/api/auth/check` returns `{"ok":false}`
+5. Login at `http://localhost:8080` with admin/admin works
 6. With JS8Call running and TCP API enabled: status bar populates, messages appear
 7. Send a message → appears in chat with actual text (not "Transmitted frame")
 8. Click a callsign's search icon → new tab opens and auto-activates, filtered to that callsign
@@ -310,3 +311,5 @@ These features were added after the initial codebase and are not in the original
 | Mobile tab touch targets | `style.css` (min-height: 44px on nav-link) |
 | Inbox tab | `model/inboxMessage.go`, `inboxActivity.go`, `inboxApi.go`, `js8call.go`, `webappServer.go`, `db.go`, `res/initDb.sql`, `inbox.mjs`, `inbox-message.mjs` |
 | Rig Control tab | `rigStatus.go`, `inboxApi.go`, `webappServer.go`, `rig.mjs` |
+| Station Details settings, hide-heartbeat filter | `stationApi.go`, `webappServer.go`, `station-details.mjs`, `chat-window.mjs`, `chat.mjs`, `style.css` |
+| Pure-Go SQLite driver (drop CGo dependency) | `db.go`, `go.mod`, `go.sum` (switched `mattn/go-sqlite3` → `modernc.org/sqlite`) |

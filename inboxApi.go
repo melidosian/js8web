@@ -28,14 +28,6 @@ type inboxStoreRequest struct {
 // POST /api/inbox — sends INBOX.STORE_MESSAGE to JS8Call
 func apiInboxPost(outgoingEvents chan<- model.Js8callEvent) func(http.ResponseWriter, *http.Request, *sql.DB) {
 	return func(w http.ResponseWriter, req *http.Request, db *sql.DB) {
-		s, ok := getSessionFromRequest(req)
-		if !ok || (s.role != model.ROLE_ADMIN && s.role != model.ROLE_OPERATOR) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "error": "insufficient permissions"})
-			return
-		}
-
 		var body inboxStoreRequest
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil || body.Callsign == "" || body.Message == "" {
 			http.Error(w, "callsign and message are required", http.StatusBadRequest)
