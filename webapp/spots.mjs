@@ -2,6 +2,7 @@ import axios from 'axios'
 import { map as createMap, tileLayer, circleMarker, layerGroup } from 'leaflet'
 import { snrColor } from './snr-color.mjs'
 import { gridToLatLon } from './grid-to-latlon.mjs'
+import { hzToMHz } from './format-freq.mjs'
 
 export default {
     emits: ['callsignSelected', 'frequencySelected'],
@@ -48,6 +49,7 @@ export default {
     },
     methods: {
         snrColor,
+        hzToMHz,
         load() {
             this.loading = true
             axios.get('/api/rx-spots')
@@ -114,7 +116,7 @@ export default {
                             <td :style="'color: ' + snrColor(spot.Snr)">{{ spot.Snr > 0 ? '+' : '' }}{{ spot.Snr }}</td>
                             <td>
                                 <a href="#" @click.prevent="$emit('frequencySelected', spot.Freq)">
-                                    <i class="bi bi-broadcast-pin"></i> {{ spot.Offset }}Hz
+                                    <i class="bi bi-broadcast-pin"></i> {{ hzToMHz(spot.Freq, 6) }}
                                 </a>
                             </td>
                             <td>{{ formatTime(spot.Timestamp) }}</td>

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { hzToMHz } from './format-freq.mjs'
 
 const PRESETS = [
     { label: '3.578', dial: 3578000 },
@@ -33,7 +34,7 @@ export default {
         rigStatus() { return this.$root.rigStatus || {} },
         dialMHz() {
             const dial = this.rigStatus.Dial
-            return dial ? (dial / 1e6).toFixed(3) : '—'
+            return dial ? hzToMHz(dial) : '—'
         },
         currentSpeed() { return this.rigStatus.Speed || '' },
         canControl() {
@@ -49,14 +50,14 @@ export default {
         rigStatus: {
             immediate: true,
             handler(status) {
-                if (!this.freqTouched && status.Dial) this.inputMHz = (status.Dial / 1e6).toFixed(3)
+                if (!this.freqTouched && status.Dial) this.inputMHz = hzToMHz(status.Dial)
                 if (!this.offsetTouched && status.Offset) this.inputOffset = status.Offset
             },
         },
     },
     methods: {
         setPreset(preset) {
-            this.inputMHz = (preset.dial / 1e6).toFixed(3)
+            this.inputMHz = hzToMHz(preset.dial)
             this.freqTouched = true
             // Keep whatever offset is already set — only the dial frequency changes on a band click.
             this.setFreq()

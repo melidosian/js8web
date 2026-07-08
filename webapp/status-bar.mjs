@@ -1,3 +1,5 @@
+import { hzToMHz } from './format-freq.mjs'
+
 export default {
     props: ['rigStatus', 'connected', 'authUser'],
     emits: ['logout'],
@@ -39,8 +41,7 @@ export default {
     `,
     methods: {
         formatFrequency(dialHz) {
-            const mhz = dialHz / 1000000
-            return mhz.toFixed(3) + ' MHz'
+            return hzToMHz(dialHz) + ' MHz'
         }
     }
 }

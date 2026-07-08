@@ -339,7 +339,7 @@ Reflects JS8Call's own band activity window; updates the same way as the Calls t
 A map and list of received station spots (JS8Call's `RX.SPOT` reports).
 
 - **Map** — one marker per callsign, plotted from its grid square, color-coded by SNR (blue=weak → red=strong). Only the most recent spot per callsign is shown, so repeat spots of the same station don't stack markers. Click a marker for a tooltip with callsign/grid/SNR, or click it to open a filtered chat tab for that callsign.
-- **List** — the 200 most recent spots, newest first: callsign, grid, SNR, frequency (click to open a frequency-filtered tab), and time.
+- **List** — the 200 most recent spots, newest first: callsign, grid, SNR, actual RX frequency in MHz (click to open a frequency-filtered tab), and time.
 
 Spots without a valid/parseable grid square aren't shown on the map (no location to plot) but still appear in the list.
 
