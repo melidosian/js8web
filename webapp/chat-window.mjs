@@ -82,8 +82,8 @@ export default {
         <template v-for="chat in chats" :id="chat.id">
             <li class="nav-item" :class="{active: activeTab == chat.id}">
                 <a class="nav-link" :class="{active: activeTab == chat.id}" @click="activateTab(chat.id)" href="#">
-                    {{ chat.label }}
-                    <a class="btn btn-light btn-sm" v-if="chat.id != 'all'" @click="closeTab(chat.id)"><i class="bi bi-x"></i></a>
+                    <span class="nav-label">{{ chat.label }}</span>
+                    <span class="tab-close" v-if="chat.id != 'all'" @click.stop.prevent="closeTab(chat.id)" title="Close tab"><i class="bi bi-x"></i></span>
                 </a>
             </li>
         </template>
