@@ -88,6 +88,20 @@ func startWebappServer(db *sql.DB, wsEventsSessionContainer *websocketSessionCon
 		methodHandler(methodRouter{post: apiRigSpeedPost(outgoingEvents)}, db),
 	))
 
+	// Station details (operator/admin only)
+	mux.HandleFunc("/api/station/grid", roleRequired(
+		[]string{model.ROLE_ADMIN, model.ROLE_OPERATOR},
+		methodHandler(methodRouter{post: apiStationSetPost(model.EVENT_TYPE_STATION_SET_GRID, outgoingEvents)}, db),
+	))
+	mux.HandleFunc("/api/station/info", roleRequired(
+		[]string{model.ROLE_ADMIN, model.ROLE_OPERATOR},
+		methodHandler(methodRouter{post: apiStationSetPost(model.EVENT_TYPE_STATION_SET_INFO, outgoingEvents)}, db),
+	))
+	mux.HandleFunc("/api/station/status", roleRequired(
+		[]string{model.ROLE_ADMIN, model.ROLE_OPERATOR},
+		methodHandler(methodRouter{post: apiStationSetPost(model.EVENT_TYPE_STATION_SET_STATUS, outgoingEvents)}, db),
+	))
+
 	mux.HandleFunc("/ws/events", websocketHandler(wsEventsSessionContainer))
 	mux.Handle("/", webappFs)
 

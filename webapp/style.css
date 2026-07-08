@@ -116,6 +116,28 @@
     flex: 1 1 0;
     min-height: 0;
     overflow: hidden;
+    position: relative;
+}
+
+.jump-to-bottom-btn {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    border: none;
+    border-radius: 20px;
+    padding: 6px 16px;
+    background: #1a6fa8;
+    color: #fff;
+    font-size: 1.3em;
+    line-height: 1;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+}
+
+.jump-to-bottom-btn:hover {
+    background: #145683;
 }
 
 .chat .chat-header {
