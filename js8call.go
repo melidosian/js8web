@@ -29,6 +29,7 @@ func readEventsFromJs8call(events chan<- model.Js8callEvent, disconnected chan<-
 				"error", errJson,
 			)
 		} else {
+			logger.Sugar().Debugw("Received from JS8Call", "type", event.Type, "json", string(jsonData))
 			events <- event
 		}
 	}
@@ -77,8 +78,8 @@ func sendConnectEvents(writer *bufio.Writer) {
 			continue
 		}
 		writer.WriteString(string(data) + "\n")
+		writer.Flush()
 	}
-	writer.Flush()
 }
 
 func attachEventStreamToJs8callConnection(incomingEvents chan<- model.Js8callEvent, outgoingEvents <-chan model.Js8callEvent, conn net.Conn) {

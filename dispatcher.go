@@ -48,9 +48,13 @@ func dispatchStateChangeEvents(events <-chan model.Js8callEvent) (<-chan model.W
 				f = stationInfoNotifier
 			case model.EVENT_TYPE_RIG_PTT:
 				f = rigPttNotifier
-			case model.EVENT_TYPE_RIG_FREQ:
+			case model.EVENT_TYPE_RIG_FREQ, model.EVENT_TYPE_RIG_SET_FREQ:
+				// JS8Call echoes SET commands back to the sender under their own
+				// command type rather than the corresponding status broadcast type,
+				// so RIG.SET_FREQ needs the same handling as RIG.FREQ.
 				f = rigFreqNotifier
-			case model.EVENT_TYPE_MODE_SPEED:
+			case model.EVENT_TYPE_MODE_SPEED, model.EVENT_TYPE_MODE_SET_SPEED:
+				// Same reasoning as RIG.SET_FREQ above.
 				f = modeSpeedNotifier
 			case model.EVENT_TYPE_INBOX_MESSAGES:
 				f = inboxMessagesNotifier
