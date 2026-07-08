@@ -23,6 +23,8 @@ export default {
             speeds: SPEEDS,
             inputMHz: '',
             inputOffset: 1500,
+            freqTouched: false,
+            offsetTouched: false,
             settingFreq: false,
             settingSpeed: false,
         }
@@ -39,10 +41,25 @@ export default {
             return role === 'admin' || role === 'operator'
         },
     },
+    watch: {
+        // rigStatus loads asynchronously and updates on every broadcast. Pre-fill the
+        // dial/offset inputs from it so adjusting one doesn't require re-typing the
+        // other — but stop once the user has actually touched a field, so a broadcast
+        // arriving mid-edit doesn't yank the control out from under them.
+        rigStatus: {
+            immediate: true,
+            handler(status) {
+                if (!this.freqTouched && status.Dial) this.inputMHz = (status.Dial / 1e6).toFixed(3)
+                if (!this.offsetTouched && status.Offset) this.inputOffset = status.Offset
+            },
+        },
+    },
     methods: {
         setPreset(preset) {
             this.inputMHz = (preset.dial / 1e6).toFixed(3)
+            this.freqTouched = true
             this.inputOffset = this.rigStatus.Offset || 1500
+            this.offsetTouched = true
             this.setFreq()
         },
         setFreq() {
@@ -54,7 +71,12 @@ export default {
             }
             this.settingFreq = true
             axios.post('/api/rig/freq', { dial, offset })
-                .then(() => this.$emit('toast', { type: 'success', message: 'Frequency set' }))
+                .then(() => {
+                    this.$emit('toast', { type: 'success', message: 'Frequency set' })
+                    // Let the next rig-status broadcast resync the inputs to the confirmed values.
+                    this.freqTouched = false
+                    this.offsetTouched = false
+                })
                 .catch(err => {
                     const msg = err.response?.data?.error || 'Failed to set frequency'
                     this.$emit('toast', { type: 'error', message: msg })
@@ -93,16 +115,16 @@ export default {
                         {{ p.label }}
                     </button>
                 </div>
-                <div class="d-flex gap-2 flex-wrap" v-if="canControl">
+                <div class="d-flex gap-2 flex-wrap align-items-end" v-if="canControl">
                     <div class="input-group" style="max-width:220px">
                         <input type="number" class="form-control" v-model="inputMHz"
-                            step="0.001" placeholder="MHz" @keydown.enter="setFreq">
+                            step="0.001" placeholder="MHz" @input="freqTouched = true" @keydown.enter="setFreq">
                         <span class="input-group-text">MHz</span>
                     </div>
-                    <div class="input-group" style="max-width:180px">
-                        <input type="number" class="form-control" v-model="inputOffset"
-                            placeholder="Offset" @keydown.enter="setFreq">
-                        <span class="input-group-text">Hz</span>
+                    <div class="rig-offset-slider">
+                        <label class="form-label mb-0">Offset: {{ inputOffset }} Hz</label>
+                        <input type="range" class="form-range" min="200" max="3000" step="50"
+                            v-model.number="inputOffset" @input="offsetTouched = true" @change="setFreq">
                     </div>
                     <button class="btn btn-primary" @click="setFreq" :disabled="settingFreq">
                         <i class="bi" :class="settingFreq ? 'bi-hourglass-split' : 'bi-arrow-right-circle'"></i> Set
