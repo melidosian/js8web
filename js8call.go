@@ -64,6 +64,10 @@ func sendConnectEvents(writer *bufio.Writer) {
 		model.EVENT_TYPE_INBOX_GET_MESSAGES,
 		model.EVENT_TYPE_RIG_GET_FREQ,
 		model.EVENT_TYPE_MODE_GET_SPEED,
+		model.EVENT_TYPE_STATION_GET_CALLSIGN,
+		model.EVENT_TYPE_STATION_GET_GRID,
+		model.EVENT_TYPE_STATION_GET_INFO,
+		model.EVENT_TYPE_STATION_GET_STATUS,
 	}
 	for _, t := range initTypes {
 		data, err := json.Marshal(model.Js8callEvent{Type: t})

@@ -1,5 +1,6 @@
 export const DEFAULT_QUICK_REPLIES = [
-    { id: 1, label: 'CQ',      color: '#1a6fa8', message: 'CQ' },
+    { id: 6, label: 'HB',      color: '#16a085', message: '@HB HEARTBEAT <MYGRID4>' },
+    { id: 1, label: 'CQ',      color: '#1a6fa8', message: '@ALLCALL CQ CQ CQ <MYGRID4>' },
     { id: 2, label: 'INFO',    color: '#27ae60', message: 'INFO' },
     { id: 3, label: 'HOW CPY', color: '#7d3c98', message: 'HOW CPY?' },
     { id: 4, label: 'QSL',     color: '#b7770d', message: 'QSL' },

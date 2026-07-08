@@ -4,6 +4,7 @@ import QuickReplySettings from './quick-reply-settings.mjs'
 import { loadQuickReplies, saveQuickReplies } from './quick-replies.mjs'
 import Inbox from './inbox.mjs'
 import Rig from './rig.mjs'
+import StationDetails from './station-details.mjs'
 
 function uidGenerator() {
     var S4 = function () {
@@ -19,6 +20,7 @@ export default {
         QuickReplySettings,
         Inbox,
         Rig,
+        StationDetails,
     },
     emits: ['toast'],
     data() {
@@ -33,6 +35,7 @@ export default {
             ],
             uid: uidGenerator(),
             settingsShowRawPackets: true,
+            settingsHideHeartbeat: false,
             quickReplies: loadQuickReplies(),
         }
     },
@@ -82,8 +85,8 @@ export default {
         <template v-for="chat in chats" :id="chat.id">
             <li class="nav-item" :class="{active: activeTab == chat.id}">
                 <a class="nav-link" :class="{active: activeTab == chat.id}" @click="activateTab(chat.id)" href="#">
-                    {{ chat.label }}
-                    <a class="btn btn-light btn-sm" v-if="chat.id != 'all'" @click="closeTab(chat.id)"><i class="bi bi-x"></i></a>
+                    <span class="nav-label">{{ chat.label }}</span>
+                    <span class="tab-close" v-if="chat.id != 'all'" @click.stop.prevent="closeTab(chat.id)" title="Close tab"><i class="bi bi-x"></i></span>
                 </a>
             </li>
         </template>
@@ -101,7 +104,7 @@ export default {
         </li>
     </ul>
     <template v-for="chat in chats">
-        <Chat v-show="activeTab == chat.id" :filter="chat.filter" :showRawPackets="this.settingsShowRawPackets" :quickReplies="quickReplies" @callsignSelected="this.callsignSelected" @frequencySelected="this.frequencySelected" @toast="e => $emit('toast', e)" />
+        <Chat v-show="activeTab == chat.id" :filter="chat.filter" :showRawPackets="this.settingsShowRawPackets" :hideHeartbeat="this.settingsHideHeartbeat" :quickReplies="quickReplies" @callsignSelected="this.callsignSelected" @frequencySelected="this.frequencySelected" @toast="e => $emit('toast', e)" />
     </template>
     <div v-show="activeTab == 'settings'" class="settings-panel">
         <div class="row">
@@ -110,8 +113,14 @@ export default {
                     <input class="form-check-input" type="checkbox" role="switch" :id="this.uid+'-show-raw-packets'" v-model="this.settingsShowRawPackets">
                     <label class="form-check-label" :for="this.uid+'-show-raw-packets'">Show raw packets</label>
                 </div>
+                <div class="form-check form-switch settings">
+                    <input class="form-check-input" type="checkbox" role="switch" :id="this.uid+'-hide-heartbeat'" v-model="this.settingsHideHeartbeat">
+                    <label class="form-check-label" :for="this.uid+'-hide-heartbeat'">Hide incoming heartbeat messages</label>
+                </div>
             </div>
         </div>
+        <hr>
+        <StationDetails @toast="e => $emit('toast', e)" />
         <hr>
         <QuickReplySettings v-model="quickReplies" />
     </div>

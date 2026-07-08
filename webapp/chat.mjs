@@ -4,15 +4,15 @@ import QuickReplyBar from './quick-reply-bar.mjs'
 const EXPECTED_MESSAGES_COUNT = 100
 
 export default {
-    props: ['filter', 'showRawPackets', 'quickReplies'],
+    props: ['filter', 'showRawPackets', 'hideHeartbeat', 'quickReplies'],
     emits: ['callsignSelected', 'frequencySelected', 'toast'],
     components: {
         ChatMessage,
         QuickReplyBar,
     },
     created() {
-        this.fetchNewestMessages().then(messages => {   
-            this.messages = messages
+        this.fetchNewestMessages().then(messages => {
+            this.messages = messages.filter(this.filterMessage)
             this.atBottom = true;
             this.$nextTick(_ => {
                 this.scrollToBottom()
@@ -29,6 +29,8 @@ export default {
             messages: [],
             atTop: false,
             atBottom: false,
+            scrolledToBottom: true,
+            newMessagesWaiting: false,
             loadingBefore: false,
             loadingAfter: false,
             txText: '',
@@ -40,6 +42,10 @@ export default {
         chatScroll(evt) {
             const el = evt.target
             const pos = el.scrollTop / el.scrollHeight
+            this.scrolledToBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 40
+            if (this.scrolledToBottom) {
+                this.newMessagesWaiting = false
+            }
             if (pos < 0.2 && !this.atTop && !this.loadingBefore) {
                 this.loadingBefore = true
                 this.fetchMessagesBefore()
@@ -67,8 +73,8 @@ export default {
             const from = this.messages[0].Timestamp
             this.fetchMessages(from, 'before').then(result => {
                 const existingIds = this.messages.map(e => e.Id)
-                const filteredResult = result.filter(e => !existingIds.includes(e.Id))
-                this.messages = filteredResult.concat(this.messages.slice(0, 2 * EXPECTED_MESSAGES_COUNT))
+                const filteredResult = result.filter(e => !existingIds.includes(e.Id) && this.filterMessage(e))
+                this.messages = filteredResult.concat(this.messages)
                 this.loadingBefore = false
                 this.atBottom = false
                 if (result.length < EXPECTED_MESSAGES_COUNT) {
@@ -83,7 +89,7 @@ export default {
             const from = this.messages[this.messages.length - 1].Timestamp
             this.fetchMessages(from, 'after').then(result => {
                 const existingIds = this.messages.map(e => e.Id)
-                const filteredResult = result.filter(e => !existingIds.includes(e.Id))
+                const filteredResult = result.filter(e => !existingIds.includes(e.Id) && this.filterMessage(e))
                 this.messages = this.messages.slice(-2 * EXPECTED_MESSAGES_COUNT).concat(filteredResult)
                 this.loadingAfter = false
                 this.atTop = false
@@ -97,6 +103,9 @@ export default {
         },
         filterMessage(message) {
             var ret = true;
+            if (this.hideHeartbeat && message.Type !== 'TX.FRAME') {
+                ret &&= !(message.Text || '').toUpperCase().includes('HEARTBEAT')
+            }
             if (this.filter) {
                 if (this.filter.Callsign) {
                     const needle = this.filter.Callsign.toLowerCase()
@@ -123,8 +132,21 @@ export default {
 
             if (this.atBottom) {
                 this.messages.push(message)
-                this.$nextTick(_ => this.scrollToBottom())
+                if (this.scrolledToBottom) {
+                    this.$nextTick(_ => this.scrollToBottom())
+                } else {
+                    this.newMessagesWaiting = true
+                }
             }
+        },
+        jumpToBottom() {
+            this.newMessagesWaiting = false
+            this.fetchNewestMessages().then(messages => {
+                this.messages = messages.filter(this.filterMessage)
+                this.atTop = false
+                this.atBottom = true
+                this.$nextTick(_ => this.scrollToBottom())
+            })
         },
         event(evt) {
             const event = evt.detail;
@@ -193,6 +215,9 @@ export default {
             <div class="loader" v-if="loadingAfter">LOADING</div>
             <div class="history-bottom" v-if="atBottom"><i class="bi bi-broadcast"></i> receiving <i class="bi bi-broadcast"></i></div>
         </div>
+        <button class="jump-to-bottom-btn" v-if="newMessagesWaiting || !atBottom" @click="jumpToBottom" :title="newMessagesWaiting ? 'New messages' : 'Back to latest'">
+            <i class="bi bi-arrow-down-circle-fill"></i>
+        </button>
         <div class="chat-input" v-if="$root.authenticated && ($root.authUser?.role === 'admin' || $root.authUser?.role === 'operator')">
             <QuickReplyBar :quickReplies="quickReplies" @insert="insertQuickReply" />
             <div class="input-group">
