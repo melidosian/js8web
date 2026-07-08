@@ -1,5 +1,5 @@
 export default {
-    props: ['stationInfo', 'rigStatus', 'connected', 'authUser'],
+    props: ['rigStatus', 'connected', 'authUser'],
     emits: ['logout'],
     template: `
     <div class="status-bar d-flex align-items-center px-3 py-1">
@@ -7,11 +7,6 @@ export default {
             <span class="connection-indicator me-2" :class="connected ? 'connected' : 'disconnected'" :title="connected ? 'Connected' : 'Disconnected'">
                 <i class="bi" :class="connected ? 'bi-wifi' : 'bi-wifi-off'"></i>
             </span>
-        </div>
-
-        <div class="status-section me-4" v-if="stationInfo.Call">
-            <span class="status-label">Call</span>
-            <span class="status-value fw-bold">{{ stationInfo.Call }}</span>
         </div>
 
         <div class="status-section me-4" v-if="rigStatus.Dial">

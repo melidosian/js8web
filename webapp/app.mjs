@@ -145,7 +145,7 @@ export default {
     </template>
     <template v-else>
         <div class="d-flex flex-column vh-100">
-            <StatusBar :stationInfo="stationInfo" :rigStatus="rigStatus" :connected="wsConnected" :authUser="authUser" @logout="handleLogout" />
+            <StatusBar :rigStatus="rigStatus" :connected="wsConnected" :authUser="authUser" @logout="handleLogout" />
             <div class="ptt-indicator" v-if="pttActive"><i class="bi bi-broadcast"></i> TX</div>
             <div class="flex-fill d-flex flex-column overflow-hidden p-2">
                 <ChatWindow @toast="showToast" />
