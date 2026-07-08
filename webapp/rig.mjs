@@ -58,8 +58,7 @@ export default {
         setPreset(preset) {
             this.inputMHz = (preset.dial / 1e6).toFixed(3)
             this.freqTouched = true
-            this.inputOffset = this.rigStatus.Offset || 1500
-            this.offsetTouched = true
+            // Keep whatever offset is already set — only the dial frequency changes on a band click.
             this.setFreq()
         },
         setFreq() {
