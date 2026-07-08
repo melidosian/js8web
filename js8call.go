@@ -60,6 +60,23 @@ func writeEventsToJs8call(events <-chan model.Js8callEvent, disconnected chan<- 
 	}
 }
 
+// noParamsRequest marshals a JS8Call request with a genuinely empty params object
+// ({"params":{}}), matching the documented shape for argument-less GET_ commands.
+// model.Js8callEvent can't produce this: its Params field is a fixed struct with no
+// omitempty tags, so json.Marshal always fills in all ~25 fields at their zero value.
+// That bloated payload is silently ignored by some JS8Call handlers — confirmed live:
+// RX.GET_CALL_ACTIVITY/RX.GET_BAND_ACTIVITY never answered it, but respond instantly
+// to the minimal form sent here, while RIG.GET_FREQ/MODE.GET_SPEED tolerate either.
+type noParamsRequest struct {
+	Type   string                 `json:"type"`
+	Value  string                 `json:"value"`
+	Params map[string]interface{} `json:"params"`
+}
+
+func marshalNoParamsRequest(t string) ([]byte, error) {
+	return json.Marshal(noParamsRequest{Type: t, Params: map[string]interface{}{}})
+}
+
 func sendConnectEvents(writer *bufio.Writer) {
 	initTypes := []string{
 		model.EVENT_TYPE_INBOX_GET_MESSAGES,
@@ -73,7 +90,7 @@ func sendConnectEvents(writer *bufio.Writer) {
 		model.EVENT_TYPE_RX_GET_BAND_ACTIVITY,
 	}
 	for _, t := range initTypes {
-		data, err := json.Marshal(model.Js8callEvent{Type: t})
+		data, err := marshalNoParamsRequest(t)
 		if err != nil {
 			continue
 		}
@@ -82,32 +99,41 @@ func sendConnectEvents(writer *bufio.Writer) {
 	}
 }
 
-// retryUnansweredRigStatus re-sends RIG.GET_FREQ / MODE.GET_SPEED a few times if
-// JS8Call never answered the connect-time request — seen in practice to sometimes
-// go unanswered (e.g. under connection-pool pressure), unlike INBOX.GET_MESSAGES,
-// which JS8Call answers reliably. Stops as soon as rigStatusCache is populated or
-// the connection drops.
-func retryUnansweredRigStatus(writer *bufio.Writer, stop <-chan struct{}) {
+// retryUnansweredConnectRequests re-sends RIG.GET_FREQ / MODE.GET_SPEED / RX.GET_CALL_ACTIVITY /
+// RX.GET_BAND_ACTIVITY every few seconds if JS8Call never answered the connect-time request —
+// seen in practice to sometimes go unanswered (e.g. under connection-pool pressure), unlike
+// INBOX.GET_MESSAGES, which JS8Call answers reliably. Each is retried independently until its
+// cache is populated, up to a bounded number of attempts, or the connection drops.
+func retryUnansweredConnectRequests(writer *bufio.Writer, stop <-chan struct{}) {
+	pending := func() map[string]bool {
+		return map[string]bool{
+			model.EVENT_TYPE_RIG_GET_FREQ:         rigStatusCache.Dial == 0,
+			model.EVENT_TYPE_MODE_GET_SPEED:       rigStatusCache.Speed == "",
+			model.EVENT_TYPE_RX_GET_CALL_ACTIVITY: len(callActivityCache) == 0,
+			model.EVENT_TYPE_RX_GET_BAND_ACTIVITY: len(bandActivityCache) == 0,
+		}
+	}
 	for i := 0; i < 5; i++ {
 		select {
 		case <-stop:
 			return
 		case <-time.After(4 * time.Second):
 		}
-		if rigStatusCache.Dial != 0 && rigStatusCache.Speed != "" {
+		still := pending()
+		anyPending := false
+		for t, unanswered := range still {
+			if !unanswered {
+				continue
+			}
+			anyPending = true
+			if data, err := marshalNoParamsRequest(t); err == nil {
+				logger.Sugar().Debugw("Retrying unanswered connect request", "type", t)
+				writer.WriteString(string(data) + "\n")
+				writer.Flush()
+			}
+		}
+		if !anyPending {
 			return
-		}
-		if rigStatusCache.Dial == 0 {
-			if data, err := json.Marshal(model.Js8callEvent{Type: model.EVENT_TYPE_RIG_GET_FREQ}); err == nil {
-				writer.WriteString(string(data) + "\n")
-				writer.Flush()
-			}
-		}
-		if rigStatusCache.Speed == "" {
-			if data, err := json.Marshal(model.Js8callEvent{Type: model.EVENT_TYPE_MODE_GET_SPEED}); err == nil {
-				writer.WriteString(string(data) + "\n")
-				writer.Flush()
-			}
 		}
 	}
 }
@@ -130,7 +156,7 @@ func attachEventStreamToJs8callConnection(incomingEvents chan<- model.Js8callEve
 
 	go readEventsFromJs8call(incomingJs8callEvents, disconnected, reader)
 	go writeEventsToJs8call(outgoingJs8callEvents, disconnected, writer)
-	go retryUnansweredRigStatus(writer, stopRetry)
+	go retryUnansweredConnectRequests(writer, stopRetry)
 
 	for {
 		select {

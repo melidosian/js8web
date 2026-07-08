@@ -96,12 +96,36 @@ func (e *Js8callEvent) UnmarshalJSON(data []byte) error {
 	}
 	switch e.Type {
 	case EVENT_TYPE_RX_CALL_ACTIVITY:
-		return json.Unmarshal(raw.Params, &e.CallActivity)
+		m, err := unmarshalActivityDict[CallActivityEntry](raw.Params)
+		e.CallActivity = m
+		return err
 	case EVENT_TYPE_RX_BAND_ACTIVITY:
-		return json.Unmarshal(raw.Params, &e.BandActivity)
+		m, err := unmarshalActivityDict[BandActivityEntry](raw.Params)
+		e.BandActivity = m
+		return err
 	default:
 		return json.Unmarshal(raw.Params, &e.Params)
 	}
+}
+
+// unmarshalActivityDict decodes a call/band activity params dict entry-by-entry, skipping
+// any key that isn't a real entry — observed live: JS8Call mixes a stray numeric "_ID" key
+// into the same object as the actual per-callsign/per-offset entries (not shown in the
+// documented example payload), which would otherwise fail the unmarshal for the whole event.
+func unmarshalActivityDict[T any](data []byte) (map[string]T, error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, err
+	}
+	result := make(map[string]T, len(raw))
+	for key, value := range raw {
+		var entry T
+		if err := json.Unmarshal(value, &entry); err != nil {
+			continue
+		}
+		result[key] = entry
+	}
+	return result, nil
 }
 
 // CallActivityEntry is one callsign's entry in RX.CALL_ACTIVITY's params dict.
