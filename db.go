@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/PiotrTopa/js8web/model"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // Initializes DB for the first time
@@ -47,7 +47,7 @@ func initDbConnection() *sql.DB {
 		recreate = true
 	}
 
-	db, err := sql.Open("sqlite3", DB_FILE_PATH)
+	db, err := sql.Open("sqlite", DB_FILE_PATH)
 	if err != nil {
 		logger.Sugar().Fatalw("Could not open or create database file",
 			"file", DB_FILE_PATH,
