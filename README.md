@@ -44,15 +44,15 @@ go build -o js8web .
 
 | Chat | Rig Control |
 |---|---|
-| ![Chat view](docs/screenshots/chat.jpg) | ![Rig control tab](docs/screenshots/rig.jpg) |
+| ![Chat view](docs/screenshots/chat.jpg) | ![Rig control tab](docs/screenshots/rig.png) |
 
 | Calls | Band |
 |---|---|
 | ![Calls tab](docs/screenshots/calls.jpg) | ![Band tab](docs/screenshots/band.jpg) |
 
-| Spots |
-|---|
-| ![Spots tab](docs/screenshots/spots.jpg) |
+| Spots | Settings |
+|---|---|
+| ![Spots tab](docs/screenshots/spots.jpg) | ![Settings tab](docs/screenshots/settings.jpg) |
 
 ## Documentation
 
