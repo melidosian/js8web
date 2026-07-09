@@ -40,6 +40,20 @@ go build -o js8web .
 - **SQLite persistence** — all activity logged; survives restarts
 - **Single binary, pure Go** — embedded web interface; no CGo/GCC required to build
 
+## Screenshots
+
+| Chat | Rig Control |
+|---|---|
+| ![Chat view](docs/screenshots/chat.jpg) | ![Rig control tab](docs/screenshots/rig.jpg) |
+
+| Calls | Band |
+|---|---|
+| ![Calls tab](docs/screenshots/calls.jpg) | ![Band tab](docs/screenshots/band.jpg) |
+
+| Spots |
+|---|
+| ![Spots tab](docs/screenshots/spots.jpg) |
+
 ## Documentation
 
 - **[User Manual](USER_MANUAL.md)** — installation, configuration, and full usage guide
