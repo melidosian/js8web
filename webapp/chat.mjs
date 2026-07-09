@@ -38,6 +38,12 @@ export default {
             savedSelection: null,
         }
     },
+    computed: {
+        txTextUpper: {
+            get() { return this.txText },
+            set(val) { this.txText = val.toUpperCase() },
+        },
+    },
     methods: {
         chatScroll(evt) {
             const el = evt.target
@@ -122,8 +128,9 @@ export default {
                 if (this.filter.Callsign) {
                     const needle = this.filter.Callsign.toLowerCase()
                     if (message.Type === 'TX.FRAME') {
+                        const text = (message.Text || '').toLowerCase()
                         const selected = (message.Selected || '').toLowerCase()
-                        ret &&= selected.includes(needle)
+                        ret &&= text.includes('@' + needle) || selected.includes(needle)
                     } else {
                         const heap = ((message.From || '') + ':' + (message.To || '')).toLocaleLowerCase()
                         ret &&= heap.includes(needle)
@@ -217,7 +224,7 @@ export default {
             const len = this.txText.length
             const start = this.savedSelection ? this.savedSelection.start : len
             const end   = this.savedSelection ? this.savedSelection.end   : len
-            this.txText = this.txText.slice(0, start) + text + this.txText.slice(end)
+            this.txText = (this.txText.slice(0, start) + text + this.txText.slice(end)).toUpperCase()
             const newPos = start + text.length
             this.savedSelection = { start: newPos, end: newPos }
             this.$nextTick(() => {
@@ -246,7 +253,7 @@ export default {
             <QuickReplyBar :quickReplies="quickReplies" @insert="insertQuickReply" />
             <div class="input-group">
                 <span class="input-group-text" v-if="filter && filter.Callsign">@{{ filter.Callsign }}</span>
-                <input type="text" class="form-control" :placeholder="filter && filter.Callsign ? 'Type reply...' : 'Type message to send via JS8Call...'" v-model="txText" @keydown="handleTxKeydown" @blur="saveCursorPosition" ref="txInput" :disabled="txSending">
+                <input type="text" class="form-control" :placeholder="filter && filter.Callsign ? 'Type reply...' : 'Type message to send via JS8Call...'" v-model="txTextUpper" @keydown="handleTxKeydown" @blur="saveCursorPosition" ref="txInput" :disabled="txSending">
                 <button class="btn btn-primary" @click="sendMessage" :disabled="!txText.trim() || txSending">
                     <i class="bi" :class="txSending ? 'bi-hourglass-split' : 'bi-send'"></i> Send
                 </button>

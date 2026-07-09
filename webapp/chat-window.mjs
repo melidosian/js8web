@@ -16,6 +16,20 @@ function uidGenerator() {
     return (S4() + S4() + "-" + S4() + "-" + S4() + "-" + S4() + "-" + S4() + S4() + S4());
 }
 
+function loadOpenTabs() {
+    try {
+        const stored = localStorage.getItem('openTabs')
+        if (stored) return JSON.parse(stored)
+    } catch (e) {}
+    return []
+}
+
+function saveOpenTabs(tabs) {
+    try {
+        localStorage.setItem('openTabs', JSON.stringify(tabs))
+    } catch (e) {}
+}
+
 export default {
     components: {
         Chat,
@@ -31,13 +45,14 @@ export default {
     emits: ['toast'],
     data() {
         return {
-            activeTab: 'all',
+            activeTab: localStorage.getItem('activeTab') || 'all',
             chats: [
                 {
                     id: 'all',
                     label: 'All messages',
                     filter: {},
                 },
+                ...loadOpenTabs(),
             ],
             uid: uidGenerator(),
             settingsShowRawPackets: true,
@@ -49,7 +64,14 @@ export default {
         quickReplies: {
             deep: true,
             handler(val) { saveQuickReplies(val) }
-        }
+        },
+        chats: {
+            deep: true,
+            handler(val) { saveOpenTabs(val.filter(c => c.id !== 'all')) }
+        },
+        activeTab(val) {
+            try { localStorage.setItem('activeTab', val) } catch (e) {}
+        },
     },
     methods: {
         activateTab(selected) {
