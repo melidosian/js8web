@@ -26,11 +26,6 @@ export default {
             <span class="status-value speed-badge" :class="'speed-' + rigStatus.Speed">{{ rigStatus.Speed }}</span>
         </div>
 
-        <div class="status-section me-3" v-if="rigStatus.Selected">
-            <span class="status-label">Selected</span>
-            <span class="status-value">{{ rigStatus.Selected }}</span>
-        </div>
-
         <div class="status-section ms-auto d-flex align-items-center" v-if="authUser">
             <span class="status-user me-2"><i class="bi bi-person-circle"></i> {{ authUser.username }}</span>
             <button class="btn btn-sm btn-outline-light status-logout-btn" @click="$emit('logout')" title="Sign out">

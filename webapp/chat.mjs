@@ -11,18 +11,16 @@ export default {
         QuickReplyBar,
     },
     created() {
-        this.fetchNewestMessages().then(messages => {
-            this.messages = messages.filter(this.filterMessage)
-            this.atBottom = true;
-            this.$nextTick(_ => {
-                this.scrollToBottom()
-            })
-        })
-
+        this.reloadMessages()
         this.$nextTick(_ => window.addEventListener('event', this.event))
     },
     unmounted() {
         window.removeEventListener('event', this.event)
+    },
+    watch: {
+        hideHeartbeat() {
+            this.reloadMessages()
+        },
     },
     data() {
         return {
@@ -45,6 +43,16 @@ export default {
         },
     },
     methods: {
+        reloadMessages() {
+            this.fetchNewestMessages().then(messages => {
+                this.messages = messages.filter(this.filterMessage)
+                this.atTop = false
+                this.atBottom = true
+                this.$nextTick(_ => {
+                    this.scrollToBottom()
+                })
+            })
+        },
         chatScroll(evt) {
             const el = evt.target
             const pos = el.scrollTop / el.scrollHeight
@@ -166,12 +174,7 @@ export default {
                 this.$nextTick(_ => this.scrollToBottom())
                 return
             }
-            this.fetchNewestMessages().then(messages => {
-                this.messages = messages.filter(this.filterMessage)
-                this.atTop = false
-                this.atBottom = true
-                this.$nextTick(_ => this.scrollToBottom())
-            })
+            this.reloadMessages()
         },
         event(evt) {
             const event = evt.detail;
